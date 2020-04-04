@@ -3,3 +3,5 @@
 /build/
 *.egg-info
 *.egg
+**/.vscode
+**/__pycache__
