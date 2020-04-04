@@ -1,5 +1,5 @@
 import os
-import setuptools
+import setuptools  # type: ignore
 
 
 with open(os.path.join(os.path.dirname(__file__), "README.md"), "r") as readme:

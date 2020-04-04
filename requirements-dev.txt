@@ -1,0 +1,7 @@
+flake8
+ipython
+mypy>=0.750,<0.760  # mypyls 0.1 incompatible with v0.770
+https://github.com/matangover/mypyls/archive/master.zip#egg=mypyls[default-mypy]
+pipdeptree
+pylint
+rope
