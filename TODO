@@ -1,0 +1,7 @@
+Rensa sync_db-anrop
+
+Se till så twitterhal använder self.db = Database()
+
+Gör init_db utökningsvänlig
+
+Fixa så bara --run skickar logging till stdout

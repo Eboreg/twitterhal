@@ -1,6 +1,8 @@
-import os
-import setuptools  # type: ignore
+#!/usr/bin/env python3
 
+import os
+
+import setuptools  # type: ignore
 
 with open(os.path.join(os.path.dirname(__file__), "README.md"), "r") as readme:
     long_description = readme.read()
@@ -34,9 +36,14 @@ setuptools.setup(
         "python-Levenshtein",
         "python-twitter",
         "emoji",
-        "detectlanguage",
     ],
+    extras_require={
+        "detectlanguage": ["detectlanguage"],
+    },
     dependency_links=[
         "https://github.com/Eboreg/megahal/tarball/master#egg=megahal-0.3",
     ],
+    entry_points={
+        "console_scripts": ["twitterhal=twitterhal.command_line:main"],
+    }
 )
