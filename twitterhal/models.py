@@ -3,21 +3,16 @@ from collections import UserList
 from datetime import datetime
 from email.utils import formatdate
 from threading import RLock
-from typing import TYPE_CHECKING, Iterable
 
 from Levenshtein import ratio  # pylint: disable=no-name-in-module
 from twitter.models import Status
 
+from twitterhal.conf import settings
 from twitterhal.util import strip_phrase
-
-if TYPE_CHECKING:
-    from shelve import DbfilenameShelf
-    from typing import Any, Dict, List, Optional, Type, TypeVar, Union
-    T = TypeVar("T")
 
 
 class DatabaseItem:
-    def __init__(self, name: str, type_: "Type[T]", default_value: "T"):
+    def __init__(self, name, type_, default_value):
         self.type = type_
         self.name = name
         self.default_value = self.value = default_value
@@ -30,7 +25,7 @@ class DatabaseItem:
 
 class Database:
     """Wrapper for typed `shelve` DB storing TwitterHAL data."""
-    def __init__(self, db_name: str = "twitterhal", writeback: bool = False, keep_synced: bool = True):
+    def __init__(self, db_name="twitterhal", writeback=False, keep_synced=True):
         """Initialize the DB.
 
         Args:
@@ -49,13 +44,12 @@ class Database:
         self.__is_open = False
         self.__db_name = db_name
         self.__lock = RLock()
-        self.__db: "DbfilenameShelf"
         self.__schema = {
             "posted_tweets": DatabaseItem("posted_tweets", TweetList, TweetList(unique=True)),
             "mentions": DatabaseItem("mentions", TweetList, TweetList(unique=True)),
         }
 
-    def add_key(self, name: str, type_: "Type[T]", default: "T"):
+    def add_key(self, name, type_, default):
         assert not self.__is_open, "Cannot add to schema once DB has been opened"
         self.__schema[name] = DatabaseItem(name, type_, default)
 
@@ -66,7 +60,7 @@ class Database:
     def __exit__(self, *args, **kwargs):
         self.close()
 
-    def __setattr__(self, name: str, value):
+    def __setattr__(self, name, value):
         if not name.startswith("_"):
             with self.__lock:
                 assert self.__is_open, "Database is not open; run open() first"
@@ -108,22 +102,8 @@ class Tweet(Status):
     self.is_processed - incoming tweet, to denote whether it's been processed
         and learnt by MegaHAL
     """
-    created_at: "Optional[str]"
-    filtered_text: str
-    full_text: "Optional[str]"
-    id: "Optional[int]"
-    in_reply_to_status_id: "Optional[int]"
-    is_answered: bool
-    is_processed: bool
-    text: str
 
-    def __init__(
-        self,
-        is_answered: bool = False,
-        is_processed: bool = False,
-        filtered_text: "Optional[str]" = None,
-        **kwargs
-    ):
+    def __init__(self, is_answered=False, is_processed=False, filtered_text=None, **kwargs):
         super().__init__(**kwargs)
         self.text = self.full_text or self.text
         if filtered_text is None:
@@ -134,26 +114,23 @@ class Tweet(Status):
         self.is_processed = is_processed
         self.created_at = self.created_at or formatdate()
 
-    def __eq__(self, other: "Any") -> bool:
+    def __eq__(self, other):
         if issubclass(other.__class__, Status):
             return self.id == other.id
         return False
 
     @classmethod
-    def from_status(cls, status: "Status"):
+    def from_status(cls, status):
         kwargs = {}
         for param, default in status.param_defaults.items():
             kwargs[param] = getattr(status, param, default)
         return cls(**kwargs)
 
 
-class TweetList(UserList, Iterable[Tweet]):
+class TweetList(UserList):
     """A list of Tweet objects."""
 
-    data: "List[Tweet]"
-    unique: bool = False
-
-    def __init__(self, initlist: "Optional[List[Tweet]]" = None, unique: bool = False):
+    def __init__(self, initlist=None, unique=False):
         """Initialize the list.
 
         Args:
@@ -217,7 +194,7 @@ class TweetList(UserList, Iterable[Tweet]):
         else:
             self.data.extend(other)
 
-    def get_by_id(self, id: int) -> "Optional[Tweet]":
+    def get_by_id(self, id):
         if not self.unique:
             raise ValueError("Refusing to run get_by_id() when unique == False")
         try:
@@ -225,7 +202,7 @@ class TweetList(UserList, Iterable[Tweet]):
         except IndexError:
             return None
 
-    def only_in_language(self, language_code: str):
+    def only_in_language(self, language_code):
         """Get TweetList of those Tweets that seem to be in a given language.
 
         Tweet language is decided by the `detectlanguage` API:
@@ -235,7 +212,7 @@ class TweetList(UserList, Iterable[Tweet]):
         """
         import detectlanguage
         if detectlanguage.configuration.api_key is None:
-            raise ValueError("Detectlanguage API key not set")
+            detectlanguage.configuration.api_key = settings.DETECTLANGUAGE_API_KEY
         if not isinstance(language_code, str):
             raise ValueError("language_code has to be string")
         result = []
@@ -248,7 +225,7 @@ class TweetList(UserList, Iterable[Tweet]):
                 pass
         self.data = result
 
-    def older_than(self, t: "Union[float, int, datetime]") -> "TweetList":
+    def older_than(self, t):
         """Get TweetList of Tweets older than a given value.
 
         Args:
@@ -261,7 +238,7 @@ class TweetList(UserList, Iterable[Tweet]):
             raise ValueError("Argument must be a timestamp or datetime")
         return self.__class__([tweet for tweet in self.data if tweet.created_at_in_seconds < t])
 
-    def remove_older_than(self, t: "Union[float, int, datetime]") -> int:
+    def remove_older_than(self, t):
         """Clears the list of Tweets older than a given value.
 
         Args:
@@ -279,7 +256,7 @@ class TweetList(UserList, Iterable[Tweet]):
         self.data = [tweet for tweet in self.data if tweet.created_at_in_seconds >= t]
         return old_count - len(self.data)
 
-    def fuzzy_duplicates(self, item: "Union[str, Tweet, Status]") -> "TweetList":
+    def fuzzy_duplicates(self, item):
         """Return TweetList of Tweets whose text is sufficiently similar to
         `item` (Levenshtein ratio > 0.8)
         """
@@ -294,51 +271,51 @@ class TweetList(UserList, Iterable[Tweet]):
         return self.__class__([t for t in self.data if ratio(t.filtered_text, string) > 0.8])
 
     @property
-    def earliest_ts(self) -> int:
+    def earliest_ts(self):
         return min([t.created_at_in_seconds for t in self.data], default=0)
 
     @property
-    def latest_ts(self) -> int:
+    def latest_ts(self):
         return max([t.created_at_in_seconds for t in self.data], default=0)
 
     @property
-    def earliest_date(self) -> "Optional[datetime]":
+    def earliest_date(self):
         ts = self.earliest_ts
         return datetime.fromtimestamp(ts) if ts > 0 else None
 
     @property
-    def latest_date(self) -> "Optional[datetime]":
+    def latest_date(self):
         ts = self.latest_ts
         return datetime.fromtimestamp(ts) if ts > 0 else None
 
     @property
-    def processed(self) -> "TweetList":
+    def processed(self):
         """Return TweetList of all Tweets that are flagged as processed"""
         return self.__class__([t for t in self.data if t.is_processed], unique=self.unique)
 
     @property
-    def non_processed(self) -> "TweetList":
+    def non_processed(self):
         """Return TweetList of all Tweets that are NOT flagged as processed"""
         return self.__class__([t for t in self.data if not t.is_processed], unique=self.unique)
 
     @property
-    def answered(self) -> "TweetList":
+    def answered(self):
         """Return TweetList of all Tweets that are flagged as replied"""
         return self.__class__([t for t in self.data if t.is_answered], unique=self.unique)
 
     @property
-    def unanswered(self) -> "TweetList":
+    def unanswered(self):
         """Return TweetList of all Tweets that are NOT flagged as replied"""
         return self.__class__([t for t in self.data if not t.is_answered], unique=self.unique)
 
     @property
-    def original_posts(self) -> "TweetList":
+    def original_posts(self):
         """Return TweetList of all Tweets that are original posts, i.e. NOT
         replies to another tweet
         """
         return self.__class__([t for t in self.data if t.in_reply_to_status_id is None], unique=self.unique)
 
     @property
-    def replies(self) -> "TweetList":
+    def replies(self):
         """Return TweetList of all Tweets that are replies to another tweet"""
         return self.__class__([t for t in self.data if t.in_reply_to_status_id is not None], unique=self.unique)

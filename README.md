@@ -34,31 +34,42 @@ with TwitterHAL(screen_name="twitterhal", twitter_kwargs={"consumer_key": "foo",
 
 ## Configuration
 
-The command line util reads config from `./twitterhal.cfg`, `~/.config/twitterhal.cfg`, `./setup.cfg`, or whatever
-filename you supply via the `-c` parameter. It's a standard INI file with these contents:
+Settings are read from a Python module specified in the `TWITTERHAL_SETTINGS_MODULE` environment variable, or whatever module you supply to the command-line utility via the `[-s | --settings]` parameter.
 
-```ini
-[twitterhal]
-screen_name = twitterhal
-random_post_times = 8:00, 16:00, 22:00  # OPTIONAL
-include_mentions = true  # OPTIONAL
-[twitter]
-consumer_key = foo
-consumer_secret = bar
-access_token_key = boo
-access_token_secret = far
-[megahal]
-brainfile = brain
-order = 5
-timeout = 30
-banwordfile = banwords.txt
+Some example settings:
+
+```python
+SCREEN_NAME = "my_k3wl_twitter_user"
+RANDOM_POST_TIMES = [datetime.time(8), datetime.time(16), datetime.time(22)]
+INCLUDE_MENTIONS = True
+DETECTLANGUAGE_API_KEY = ""
+DATABASE_CLASS = "twitterhal.models.Database"
+
+TWITTER_API = {
+    "consumer_key": "foo",
+    "consumer_secret": "bar",
+    "access_token_key": "boo",
+    "access_token_secret": "far",
+    "timeout": 40,
+    "tweet_mode": "extended",
+}
+
+MEGAHAL_API = {
+    "max_length": twitter.api.CHARACTER_LIMIT,
+    "brainfile": "twitterhal-brain",
+    "order": megahal.DEFAULT_ORDER,
+    "timeout": megahal.DEFAULT_HARD_TIMEOUT,
+    "banwords": ["MOST", "COMMON", "WORDS"],
+}
 ```
 
-`[twitter]` contains keyword arguments for `twitter.Api`. Read more about it [here](https://python-twitter.readthedocs.io/en/latest/twitter.html).
+`TWITTER_API` contains keyword arguments for `twitter.Api`. Read more about it [here](https://python-twitter.readthedocs.io/en/latest/twitter.html).
 
-`[megahal]` contains keyword arguments for `megahal.Megahal`. Consult that module for more info.
+`MEGAHAL` contains keyword arguments for `megahal.Megahal`. Consult that module for more info.
 
-`include_mentions`: if `true`, TwitterHAL will include _all_ mentions in its replies. That is, not only the @handle of the user who wrote to it, but also every user they mentioned in their tweet. Perhaps you should use this carefully. Anyway, the default is `false`.
+`INCLUDE_MENTIONS`: if `True`, TwitterHAL will include _all_ mentions in its replies. That is, not only the @handle of the user who wrote to it, but also every user they mentioned in their tweet. Perhaps you should use this carefully. Anyway, the default is `False`.
+
+`MEGAHAL_API["banwords"]`: you may want to set this if your bot will not be speaking English. Pro tip: search for a list of the ~300 most commonly used words in your language, and use those.
 
 ## Extending
 
@@ -68,6 +79,6 @@ By default, the database (which is of type `models.Database`) will contain:
 * `posted_tweets` (`models.TweetList`): List of posted Tweets
 * `mentions` (`models.TweetList`): List of tweets that mention us, and whether they have been answered
 
-Tweets are internally stored in `models.TweetList`, which contains the method `only_in_language()`. This will filter out all tweets that are _probably_ in the chosen language, with the help of the [Language Detection API](https://detectlanguage.com/). Just install the PyPI package `detectlanguage`, get yourself an API key and feed it to `detectlanguage.configuration.api_key`, and you're all set.
+Tweets are internally stored in `models.TweetList`, which contains the method `only_in_language()`. This will filter out all tweets that are _probably_ in the chosen language, with the help of the [Language Detection API](https://detectlanguage.com/). Just install the PyPI package `detectlanguage`, get yourself an API key and feed it to `detectlanguage.configuration.api_key` (or set it in your settings; see above), and you're all set.
 
 If you extend TwitterHAL with new methods that call the Twitter API, it's recommended you also check TwitterHAL's `can_do_request(url)`, where `url` is something like `/statuses/mentions_timeline` (consult [this page](https://developer.twitter.com/en/docs/basics/rate-limits) for full list), to see whether this call should be made at this time.

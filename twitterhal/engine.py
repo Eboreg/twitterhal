@@ -2,27 +2,20 @@ import datetime
 import logging
 import queue
 import re
-import shelve
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, cast
+from copy import deepcopy
+from typing import cast
 
 import twitter
 from megahal import MegaHAL
 from twitter.api import CHARACTER_LIMIT
 from twitter.ratelimit import EndpointRateLimit
 
+from twitterhal.conf import settings
 from twitterhal.gracefulkiller import GracefulKiller
-from twitterhal.models import Tweet, TweetList, Database
-
-if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Sequence, Union
-    # Feel free to expand this one if you add more DB keys and want to do
-    # type checking
-    class DBInstance(Database):
-        posted_tweets: TweetList
-        mentions: TweetList
+from twitterhal.models import Tweet, TweetList
 
 logger = logging.getLogger(__name__)
 
@@ -31,28 +24,15 @@ POST_STATUS_LIMIT_RESET_FREQUENCY = 3 * 60 * 60
 
 
 class TwitterHAL:
-    def __init__(
-        self,
-        screen_name: str,
-        twitter_kwargs: "Dict[str, Any]" = {},
-        megahal_kwargs: "Dict[str, Any]" = {},
-        random_post_times: "Sequence[datetime.time]" = [datetime.time(8), datetime.time(16), datetime.time(22)],
-        include_mentions: bool = False,
-        **kwargs
-    ):
+    def __init__(self, screen_name=None, random_post_times=None, include_mentions=None, **kwargs):
         """Initialize the bot.
+
+        If not explicitly overridden here, arguments will be collected from
+        `twitterhal.conf.settings`.
 
         Args:
             screen_name (str): Twitter screen name ("handle") for this bot
                 (without the '@'!)
-            twitter_kwargs (dict): Parameters to send to twitter.Api. Should
-                at least include `consumer_key`, `consumer_secret`,
-                `access_token_key`, and `access_token_secret`.
-                Default: {"timeout": 40, "tweet_mode": "extended"}.
-                Consult that module's docs for more info:
-                https://python-twitter.readthedocs.io/en/latest/
-            megahal_kwargs (dict, optional): Parameters to send to
-                megahal.Megahal. See README.md and that module for more info.
             random_post_times (list of datetime.time, optional): The times of
                 day when random posts will be done. Defaults to 8:00, 16:00,
                 and 22:00.
@@ -60,27 +40,31 @@ class TwitterHAL:
                 @mentions in our replies, and not only that of the user we're
                 replying to
         """
-        # Type annotated definitions for later use
-        self.api: "twitter.Api"
-        self._megahal: "MegaHAL"
-        self.post_status_limit: "EndpointRateLimit"
-
-        # Take care of kwargs
-        self.twitter_kwargs = {"timeout": 40, "tweet_mode": "extended"}
-        self.twitter_kwargs.update(twitter_kwargs)
-        self.megahal_kwargs = megahal_kwargs
-        self.megahal_kwargs.update({"max_length": CHARACTER_LIMIT})
-        self.screen_name = screen_name
-        self.random_post_times = random_post_times
-        self.include_mentions = include_mentions
+        # Take care of settings
+        self.twitter_kwargs = self.get_twitter_api_kwargs()
+        self.megahal_kwargs = self.get_megahal_api_kwargs()
+        self.screen_name = screen_name or settings.SCREEN_NAME
+        self.random_post_times = random_post_times or settings.RANDOM_POST_TIMES
+        self.include_mentions = include_mentions or settings.INCLUDE_MENTIONS
 
         # Set up runtime stuff
+        Database = settings.get_database_class()
         self.db = cast("DBInstance", Database())
-        self.queue: "queue.Queue[Tweet]" = queue.Queue()
+        self.queue = queue.Queue()
         self.exit_event = threading.Event()
         self.generate_random_lock = threading.Lock()
-        self.learn_phrases_lock = threading.Lock()
-        self.megahal_open: bool = False
+        self.learn_phrases_lock = threading.Lock()  # not used?
+        self.megahal_open = False
+
+    def get_twitter_api_kwargs(self, **kwargs):
+        defaults = deepcopy(settings.TWITTER_API)
+        defaults.update(kwargs)
+        return defaults
+
+    def get_megahal_api_kwargs(self, **kwargs):
+        defaults = deepcopy(settings.MEGAHAL_API)
+        defaults.update(kwargs)
+        return defaults
 
     def __enter__(self):
         self.open()
@@ -111,7 +95,7 @@ class TwitterHAL:
             self.megahal_open = False
 
     @property
-    def megahal(self) -> "MegaHAL":
+    def megahal(self):
         if not self.megahal_open:
             logger.info("Initializing MegaHAL ...")
             self._megahal = MegaHAL(**self.megahal_kwargs)
@@ -155,7 +139,7 @@ class TwitterHAL:
             logger.debug("Putting random tweet in queue: %s", tweet)
             self.queue.put(tweet)
 
-    def generate_reply(self, mention: "Tweet"):
+    def generate_reply(self, mention):
         """Generate reply Tweet for a mention Tweet, put it in post queue"""
         # We trust that no generate_reply to this particular mention has
         # already been started (checked in get_new_mentions())
@@ -164,7 +148,7 @@ class TwitterHAL:
         logger.debug("Putting reply in queue: %s", reply)
         self.queue.put(reply)
 
-    def get_new_mentions(self) -> "TweetList":
+    def get_new_mentions(self):
         """Fetch new (unanswered) Tweets mentioning us
 
         Add new mentions to self.db.mentions, if they are not already in there.
@@ -189,7 +173,7 @@ class TwitterHAL:
 
     """ ---------- VARIOUS PUBLIC METHODS ---------- """
 
-    def can_do_request(self, url: str, count: int = 1) -> bool:
+    def can_do_request(self, url, count=1):
         """Check if we can make request(s) to a given endpoint.
 
         Args:
@@ -212,12 +196,12 @@ class TwitterHAL:
                 limit = self.api.CheckRateLimit(url)
         return limit.remaining >= count
 
-    def can_post(self, count: int = 1) -> bool:
+    def can_post(self, count=1):
         if self.post_status_limit.reset <= time.time():
             self._set_post_status_limit()
         return self.post_status_limit.remaining >= count
 
-    def generate_tweet(self, in_reply_to: "Optional[Tweet]" = None) -> "Tweet":
+    def generate_tweet(self, in_reply_to=None):
         """Generate a Tweet object
 
         Generate a new Tweet object from MegaHAL, with or without another Tweet
@@ -314,7 +298,7 @@ class TwitterHAL:
         latest_posts = [p for p in latest_posts if p.created_at_in_seconds > since]
         self._set_post_status_limit(subtract=len(latest_posts))
 
-    def _post_tweet(self, tweet: "Tweet"):
+    def _post_tweet(self, tweet):
         # Checking can_post is the responsibility of the caller.
         try:
             status = self.api.PostUpdate(
@@ -338,7 +322,7 @@ class TwitterHAL:
             logger.debug("Releasing generate_random_lock")
             self.generate_random_lock.release()
 
-    def _set_post_status_limit(self, subtract: int = 0):
+    def _set_post_status_limit(self, subtract=0):
         if hasattr(self, "post_status_limit") and self.post_status_limit.reset > time.time():
             reset = self.post_status_limit.reset
             remaining = self.post_status_limit.remaining - subtract
@@ -349,7 +333,7 @@ class TwitterHAL:
             remaining = POST_STATUS_LIMIT - subtract
         self.post_status_limit = EndpointRateLimit(limit=POST_STATUS_LIMIT, remaining=remaining, reset=reset)
 
-    def _time_for_random_post(self) -> bool:
+    def _time_for_random_post(self):
         # Find the item in self.random_post_times that is closest to the
         # current time, counted backwards. If this item differs from the item
         # closest to the last time we posted, it's time to post again.
@@ -370,7 +354,7 @@ class TwitterHAL:
         return True
 
 
-def run(hal: "TwitterHAL"):
+def run(hal):
     killer = GracefulKiller()
     with ThreadPoolExecutor() as executor:
         logger.info("Starting post_tweets_worker thread ...")

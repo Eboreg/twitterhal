@@ -1,9 +1,8 @@
 import argparse
-import configparser
 import logging
 
+from twitterhal.conf import settings
 from twitterhal.engine import TwitterHAL, run
-from twitterhal.util import get_config
 
 
 def init_logging(loglevel=logging.ERROR):
@@ -16,9 +15,9 @@ def init_logging(loglevel=logging.ERROR):
 def main():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
-        "-c", "--config",
-        help="Path to config file in ini format. If omitted, looks for ./twitterhal.cfg, ~/.config/twitterhal.cfg, "
-             "and ./setup.cfg."
+        "-s", "--settings", dest="settings_module",
+        help="Python path to settings module. If omitted, we try looking for it in the 'TWITTERHAL_SETTINGS_MODULE' "
+             "environment variable."
     )
     parser.add_argument("-d", "--debug", action="store_true", help="More verbose logging output")
     parser.add_argument(
@@ -34,6 +33,8 @@ def main():
 
     args = parser.parse_args()
 
+    settings.setup(settings_module=args.settings_module)
+
     if args.debug:
         logger = init_logging(logging.DEBUG)
         logger.debug("TESTING DEBUG LOGGING")
@@ -42,18 +43,7 @@ def main():
     else:
         logger = init_logging()
 
-    try:
-        if args.config:
-            config = get_config([args.config])
-        else:
-            config = get_config()
-    except configparser.Error as e:
-        print("Arguments in config file missing or malformed! "
-              "Please see README.md.")
-        raise e
-
-    with TwitterHAL(
-        twitter_kwargs=config["twitter"], megahal_kwargs=config["megahal"], **config["twitterhal"]) as hal:
+    with TwitterHAL() as hal:
         if args.chat:
             hal.megahal.interact()
         elif args.stats:
@@ -65,15 +55,7 @@ def main():
             print("Latest trending tweet date: %s" % hal.db.posted_tweets.replies.latest_date)
             print("Size of brain: %d" % hal.megahal.brainsize)
         elif args.print_config:
-            print("twitterhal:")
-            for k, v in config["twitterhal"].items():
-                print("  %s: %s" % (k, v))
-            print("twitter:")
-            for k, v in config["twitter"].items():
-                print("  %s: %s" % (k, v))
-            print("megahal:")
-            for k, v in config["megahal"].items():
-                print("  %s: %s" % (k, v))
+            print(settings)
         elif args.run:
             run(hal)
         else:

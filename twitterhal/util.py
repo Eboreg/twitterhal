@@ -1,18 +1,13 @@
-import configparser
 import datetime
 import html
-import os
 import re
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import emoji
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List
+    from typing import List
 
-    class ConfigParserExtended(configparser.ConfigParser):
-        def gettimelist(self, *args, **kwargs):
-            ...
 
 EMOJI_REGEX = emoji.get_emoji_regexp()
 URL_REGEX = r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
@@ -87,24 +82,4 @@ def parse_time_string_list(string: str) -> "List[datetime.time]":
             result.append(datetime.datetime.strptime(t, "%H:%M:%S").time())
         except ValueError:
             result.append(datetime.datetime.strptime(t, "%H:%M").time())
-    return result
-
-
-def get_config(
-    locations: "List[str]" = ["twitterhal.cfg", os.path.expanduser("~/.config/twitterhal.cfg"), "setup.cfg"]
-) -> "Dict[str, Any]":
-    # ConfigParser may raise NoSectionError with str attribute `section`, or
-    # NoOptionError with str attributes `option` and `section`
-    # pylint: disable=no-member
-    result: "Dict[str, Any]" = {"twitterhal": {}, "twitter": {}, "megahal": {}}
-    config = cast("ConfigParserExtended", configparser.ConfigParser(converters={"timelist": parse_time_string_list}))
-    config.read(locations)
-    result["twitterhal"]["screen_name"] = config.get("twitterhal", "screen_name")
-    result["twitterhal"]["include_mentions"] = config.getboolean("twitterhal", "include_mentions", fallback=False)
-    random_post_times = config.gettimelist("twitterhal", "random_post_times", fallback=None)
-    if random_post_times:
-        result["twitterhal"]["random_post_times"] = random_post_times
-    result["twitter"] = dict(config.items("twitter"))
-    if config.has_section("megahal"):
-        result["megahal"] = dict(config.items("megahal"))
     return result
