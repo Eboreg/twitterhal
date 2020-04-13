@@ -67,7 +67,6 @@ You may extend TwitterHAL's database by subclassing `TwitterHAL` and adding `mod
 By default, the database (which is of type `models.Database`) will contain:
 * `posted_tweets` (`models.TweetList`): List of posted Tweets
 * `mentions` (`models.TweetList`): List of tweets that mention us, and whether they have been answered
-* `api_requests` (`Dict[str, List[int]]`): Keys are the different Twitter API endpoints (e.g. "statuses/mentions_timeline"), values are timestamps for the latest requests done to those endpoints. This is to try and make sure we don't exceed the rate limits. (They will, for the most part, be reset within 15 minutes, but who wants to be forced to wait that long?)
 
 Tweets are internally stored in `models.TweetList`, which contains the method `only_in_language()`. This will filter out all tweets that are _probably_ in the chosen language, with the help of the [Language Detection API](https://detectlanguage.com/). Just install the PyPI package `detectlanguage`, get yourself an API key and feed it to `detectlanguage.configuration.api_key`, and you're all set.
 
