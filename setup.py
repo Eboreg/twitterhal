@@ -32,7 +32,7 @@ setuptools.setup(
     ],
     python_requires=">=3.6",
     install_requires=[
-        "megahal>=0.3",
+        "megahal @ git+https://github.com/Eboreg/megahal",
         "python-Levenshtein",
         "python-twitter",
         "emoji",
