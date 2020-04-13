@@ -2,6 +2,7 @@ import shelve
 from collections import UserList
 from datetime import datetime
 from email.utils import formatdate
+from threading import RLock
 from typing import TYPE_CHECKING, Iterable
 
 from Levenshtein import ratio  # pylint: disable=no-name-in-module
@@ -11,7 +12,7 @@ from twitterhal.util import strip_phrase
 
 if TYPE_CHECKING:
     from shelve import DbfilenameShelf
-    from typing import Any, List, Optional, Type, TypeVar, Union
+    from typing import Any, Dict, List, Optional, Type, TypeVar, Union
     T = TypeVar("T")
 
 
@@ -29,7 +30,7 @@ class DatabaseItem:
 
 class Database:
     """Wrapper for typed `shelve` DB storing TwitterHAL data."""
-    def __init__(self, db_name: str = "twitterhal", writeback: bool = False, keep_synced: bool = True, **extra_keys):
+    def __init__(self, db_name: str = "twitterhal", writeback: bool = False, keep_synced: bool = True):
         """Initialize the DB.
 
         Args:
@@ -40,22 +41,23 @@ class Database:
                 Default: False
             keep_synced (bool, optional): If True, will sync the DB to disk
                 every time a value is altered. May slow things down with large
-                databases. Default: True
-            **extra_keys: DB will contain these keys, with their values as
-                defaults
+                databases. If False, you will have to ensure that it always
+                exits gracefully. Default: True
         """
         self.__writeback = writeback
         self.__keep_synced = keep_synced
         self.__is_open = False
         self.__db_name = db_name
+        self.__lock = RLock()
         self.__db: "DbfilenameShelf"
         self.__schema = {
             "posted_tweets": DatabaseItem("posted_tweets", TweetList, TweetList(unique=True)),
             "mentions": DatabaseItem("mentions", TweetList, TweetList(unique=True)),
-            "api_requests": DatabaseItem("api_requests", dict, {}),
         }
-        for k, v in extra_keys.values():
-            self.__schema[k] = DatabaseItem(k, type(v), v)
+
+    def add_key(self, name: str, type_: "Type[T]", default: "T"):
+        assert not self.__is_open, "Cannot add to schema once DB has been opened"
+        self.__schema[name] = DatabaseItem(name, type_, default)
 
     def __enter__(self):
         self.open()
@@ -65,12 +67,10 @@ class Database:
         self.close()
 
     def __setattr__(self, name: str, value):
-        if not name.startswith("__"):
-            if not self.__is_open:
-                raise AttributeError("Database is not open; run open() first")
-            elif name not in self.__schema:
-                raise AttributeError("Key %s not present in DB schema" % name)
-            else:
+        if not name.startswith("_"):
+            with self.__lock:
+                assert self.__is_open, "Database is not open; run open() first"
+                assert name in self.__schema, "Key %s not present in DB schema" % name
                 self.__schema[name].value = value
                 self.__db[name] = value
                 if self.__keep_synced:
@@ -78,14 +78,20 @@ class Database:
         super().__setattr__(name, value)
 
     def open(self):
-        self.__db = shelve.open(self.__db_name, writeback=self.__writeback)
-        for k, v in self.__schema.items():
-            setattr(self, k, self.__db.get(k, v.value))
-        self.__is_open = True
+        with self.__lock:
+            self.__is_open = True
+            self.__db = shelve.open(self.__db_name, writeback=self.__writeback)
+            for k, v in self.__schema.items():
+                setattr(self, k, self.__db.get(k, v.value))
 
     def close(self):
-        self.__db.close()
-        self.__is_open = False
+        with self.__lock:
+            self.__db.close()
+            self.__is_open = False
+
+    def sync(self):
+        with self.__lock:
+            self.__db.sync()
 
 
 class Tweet(Status):
