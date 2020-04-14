@@ -203,7 +203,7 @@ class TweetList(UserList):
             return None
 
     def only_in_language(self, language_code):
-        """Get TweetList of those Tweets that seem to be in a given language.
+        """Filter for those Tweets that seem to be in a given language.
 
         Tweet language is decided by the `detectlanguage` API:
         https://detectlanguage.com/
