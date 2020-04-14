@@ -17,10 +17,13 @@ def setting_str(key=None, value="", indent=0):
         ret += "\n" + " " * indent + "}"
     elif isinstance(value, list):
         ret += "[\n"
+        too_long = False
         if len(value) > 10:
             value = value[:10]
-            value.append("(Too many values to show)")
+            too_long = True
         ret += ",\n".join([setting_str(value=v, indent=indent + 4) for v in value])
+        if too_long:
+            ret += "\n" + " " * (indent + 4) + "... (Too many values to show)"
         ret += "\n" + " " * indent + "]"
     elif isinstance(value, str):
         ret += '"%s"' % value
@@ -44,6 +47,9 @@ class Settings:
         self.default_settings = {}
 
     def setup(self, settings_module=None, settings_dict={}):
+        if self.is_setup:
+            return
+
         assert settings_module is None or isinstance(settings_module, (ModuleType, str)), \
             "settings_module must be either None, a string, or a module"
         assert isinstance(settings_dict, dict), "settings_dict must be a dict"
@@ -93,6 +99,9 @@ class Settings:
             if k.isupper():
                 ret.append(setting_str(key=k, value=v))
         return "\n".join(ret)
+
+    def get(self, key, default):
+        return getattr(self, key, default)
 
     def get_database_class(self):
         mod, klass = self.DATABASE_CLASS.rsplit(".", maxsplit=1)
