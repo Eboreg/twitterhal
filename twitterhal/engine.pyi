@@ -28,14 +28,14 @@ class TwitterHAL:
     queue: queue.Queue
     exit_event: threading.Event
     generate_random_lock: threading.Lock
-    learn_phrases_lock: threading.Lock
     megahal_open: bool
 
     def __init__(
         self,
-        screen_name: Optional[str] = None,
-        random_post_times: Optional[Sequence[datetime.time]] = None,
-        include_mentions: Optional[bool] = None,
+        screen_name: Optional[str],
+        random_post_times: Optional[Sequence[datetime.time]],
+        include_mentions: Optional[bool],
+        init_megahal: bool,
         **kwargs
     ):
         ...

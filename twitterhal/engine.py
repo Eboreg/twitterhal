@@ -4,6 +4,7 @@ import queue
 import re
 import threading
 import time
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from typing import cast
@@ -24,7 +25,7 @@ POST_STATUS_LIMIT_RESET_FREQUENCY = 3 * 60 * 60
 
 
 class TwitterHAL:
-    def __init__(self, screen_name=None, random_post_times=None, include_mentions=None, **kwargs):
+    def __init__(self, screen_name=None, random_post_times=None, include_mentions=None, init_megahal=False, **kwargs):
         """Initialize the bot.
 
         If not explicitly overridden here, arguments will be collected from
@@ -41,8 +42,6 @@ class TwitterHAL:
                 replying to
         """
         # Take care of settings
-        self.twitter_kwargs = self.get_twitter_api_kwargs()
-        self.megahal_kwargs = self.get_megahal_api_kwargs()
         self.screen_name = screen_name or settings.SCREEN_NAME
         self.random_post_times = random_post_times or settings.RANDOM_POST_TIMES
         self.include_mentions = include_mentions or settings.INCLUDE_MENTIONS
@@ -53,8 +52,10 @@ class TwitterHAL:
         self.queue = queue.Queue()
         self.exit_event = threading.Event()
         self.generate_random_lock = threading.Lock()
-        self.learn_phrases_lock = threading.Lock()  # not used?
+        self.learn_phrases_lock = threading.Lock()
         self.megahal_open = False
+        if init_megahal:
+            self.megahal
 
     def get_twitter_api_kwargs(self, **kwargs):
         defaults = deepcopy(settings.TWITTER_API)
@@ -78,7 +79,7 @@ class TwitterHAL:
         logger.info("Starting engine ...")
         try:
             logger.debug("Initializing Twitter API ...")
-            self.api = twitter.Api(**self.twitter_kwargs)
+            self.api = twitter.Api(**self.get_twitter_api_kwargs())
         except Exception as e:
             logger.error(str(e), exc_info=True)
             raise e
@@ -98,7 +99,7 @@ class TwitterHAL:
     def megahal(self):
         if not self.megahal_open:
             logger.info("Initializing MegaHAL ...")
-            self._megahal = MegaHAL(**self.megahal_kwargs)
+            self._megahal = MegaHAL(**self.get_megahal_api_kwargs())
             self.megahal_open = True
         return self._megahal
 
@@ -260,7 +261,11 @@ class TwitterHAL:
         logger.debug("Trying to initialize DB ...")
         self.db.open()
         # Just for safety:
-        random_tweets = self.api.GetUserTimeline(screen_name=self.screen_name, exclude_replies=True, count=1)
+        try:
+            random_tweets = self.api.GetUserTimeline(screen_name=self.screen_name, exclude_replies=True, count=1)
+        except twitter.TwitterError:
+            warnings.warn("Could not connect to Twitter API! Keys/secrets incorrect?")
+            random_tweets = []
         if len(random_tweets) > 0 and random_tweets[0] not in self.db.posted_tweets:
             self.db.posted_tweets.append(Tweet.from_status(random_tweets[0]))
         logger.debug("DB initialized")
@@ -288,15 +293,19 @@ class TwitterHAL:
         https://developer.twitter.com/en/docs/tweets/post-and-engage/api-reference/post-statuses-retweet-id
         """
         since = time.time() - 3 * 60 * 60
-        latest_posts = self.api.GetUserTimeline(screen_name=self.screen_name, count=200, trim_user=True)
-        # Limit within the 3 hour window is 300 requests, but Twitter only lets
-        # us fetch 200 at a time
-        if latest_posts and len(latest_posts) > 190 and latest_posts[-1].created_at_in_seconds > since:
-            latest_posts += self.api.GetUserTimeline(
-                screen_name=self.screen_name, count=200, since_id=latest_posts[-1].id, trim_user=True
-            )
-        latest_posts = [p for p in latest_posts if p.created_at_in_seconds > since]
-        self._set_post_status_limit(subtract=len(latest_posts))
+        try:
+            latest_posts = self.api.GetUserTimeline(screen_name=self.screen_name, count=200, trim_user=True)
+        except twitter.TwitterError:
+            warnings.warn("Could not connect to Twitter API! Keys/secrets incorrect?")
+        else:
+            # Limit within the 3 hour window is 300 requests, but Twitter only lets
+            # us fetch 200 at a time
+            if latest_posts and len(latest_posts) > 190 and latest_posts[-1].created_at_in_seconds > since:
+                latest_posts += self.api.GetUserTimeline(
+                    screen_name=self.screen_name, count=200, since_id=latest_posts[-1].id, trim_user=True
+                )
+            latest_posts = [p for p in latest_posts if p.created_at_in_seconds > since]
+            self._set_post_status_limit(subtract=len(latest_posts))
 
     def _post_tweet(self, tweet):
         # Checking can_post is the responsibility of the caller.
