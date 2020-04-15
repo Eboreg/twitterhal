@@ -289,9 +289,10 @@ class TwitterHAL:
         """
         while not self.queue.empty():
             if not self.force and not self.can_post():
+                logger.info("Rate limit prohibits us from posting at this time")
                 break
             tweet: "Tweet" = self.queue.get()
-            logger.debug("Got from queue: %s", tweet)
+            logger.info("Got from queue: %s", tweet)
             self._post_tweet(tweet)
 
     """ ---------- PRIVATE HELPER METHODS ---------- """

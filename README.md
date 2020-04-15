@@ -26,7 +26,7 @@ But all those should be installed automatically by `pip` or `setup.py`. (`detect
 ```python
 from twitterhal import TwitterHAL
 with TwitterHAL(screen_name="twitterhal", twitter_kwargs={"consumer_key": "foo", "consumer_secret": "bar"}) as hal:
-    for mention in hal.get_mentions():
+    for mention in hal.get_new_mentions():
         hal.generate_reply(mention)
     hal.generate_random()
     hal.post_from_queue()
