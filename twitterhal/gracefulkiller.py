@@ -2,6 +2,7 @@ import logging
 import signal
 import time
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,3 +33,6 @@ class GracefulKiller:
             elif not self.kill_now:
                 time.sleep(1)
         return False
+
+
+killer = GracefulKiller()
