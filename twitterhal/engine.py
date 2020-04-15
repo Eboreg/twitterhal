@@ -15,8 +15,9 @@ from twitter.api import CHARACTER_LIMIT
 from twitter.ratelimit import EndpointRateLimit
 
 from twitterhal.conf import settings
-from twitterhal.gracefulkiller import GracefulKiller
+from twitterhal.gracefulkiller import killer
 from twitterhal.models import Tweet, TweetList
+
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,10 @@ POST_STATUS_LIMIT_RESET_FREQUENCY = 3 * 60 * 60
 
 
 class TwitterHAL:
-    def __init__(self, screen_name=None, random_post_times=None, include_mentions=None, init_megahal=False, **kwargs):
+    def __init__(
+        self, screen_name=None, random_post_times=None, include_mentions=None,
+        init_megahal=False, force=False, **kwargs
+    ):
         """Initialize the bot.
 
         If not explicitly overridden here, arguments will be collected from
@@ -33,13 +37,17 @@ class TwitterHAL:
 
         Args:
             screen_name (str): Twitter screen name ("handle") for this bot
-                (without the '@'!)
+                (without the '@'!). Default: None
             random_post_times (list of datetime.time, optional): The times of
                 day when random posts will be done. Defaults to 8:00, 16:00,
                 and 22:00.
             include_mentions (bool, optional): Whether to include all
                 @mentions in our replies, and not only that of the user we're
-                replying to
+                replying to. Default: False
+            init_megahal (bool, optional): Initialize MegaHAL right at the
+                beginning and not on first access. Default: False
+            force (bool, optional): Try and force actions even if TwitterHAL
+                doesn't want to. Default: False
         """
         # Take care of settings
         self.screen_name = screen_name or settings.SCREEN_NAME
@@ -54,6 +62,7 @@ class TwitterHAL:
         self.generate_random_lock = threading.Lock()
         self.learn_phrases_lock = threading.Lock()
         self.megahal_open = False
+        self.force = force
         if init_megahal:
             self.megahal
 
@@ -80,6 +89,7 @@ class TwitterHAL:
         try:
             logger.debug("Initializing Twitter API ...")
             self.api = twitter.Api(**self.get_twitter_api_kwargs())
+            self.api.InitializeRateLimit()
         except Exception as e:
             logger.error(str(e), exc_info=True)
             raise e
@@ -111,7 +121,7 @@ class TwitterHAL:
         posts them.
         """
         while not self.exit_event.is_set() or not self.queue.empty():
-            if self.can_post():
+            if self.force or self.can_post():
                 try:
                     tweet: "Tweet" = self.queue.get(timeout=1)
                 except queue.Empty:
@@ -129,7 +139,7 @@ class TwitterHAL:
         simultaneously. Lock is released by _post_tweet() after post
         has been attempted (whether it succeeded or not).
         """
-        if not self._time_for_random_post():
+        if not self.force and not self._time_for_random_post():
             logger.debug("Not yet time for random post")
             pass
         elif not self.generate_random_lock.acquire(blocking=False):
@@ -158,7 +168,7 @@ class TwitterHAL:
 
         TODO: Separate "new" from "unanswered" mentions?
         """
-        if not self.can_do_request("/statuses/mentions_timeline"):
+        if not self.force and not self.can_do_request("/statuses/mentions_timeline"):
             return TweetList()
         try:
             self.db.mentions.extend(
@@ -278,6 +288,8 @@ class TwitterHAL:
         Tweets and posts them.
         """
         while not self.queue.empty():
+            if not self.force and not self.can_post():
+                break
             tweet: "Tweet" = self.queue.get()
             logger.debug("Got from queue: %s", tweet)
             self._post_tweet(tweet)
@@ -364,7 +376,6 @@ class TwitterHAL:
 
 
 def run(hal):
-    killer = GracefulKiller()
     with ThreadPoolExecutor() as executor:
         logger.info("Starting post_tweets_worker thread ...")
         post_tweets_worker = executor.submit(hal.post_tweets_worker)

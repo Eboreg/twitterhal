@@ -3,6 +3,7 @@ import datetime
 import megahal
 import twitter
 
+
 SCREEN_NAME = ""
 RANDOM_POST_TIMES = [datetime.time(8), datetime.time(16), datetime.time(22)]
 INCLUDE_MENTIONS = False

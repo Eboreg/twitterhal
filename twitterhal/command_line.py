@@ -27,12 +27,15 @@ class CommandLine:
             "-m", "--include-mentions", action="store_true",
             help="Include all mentions in replies (rather than just the handle we're replying to)"
         )
+        self.parser.add_argument(
+            "-f", "--force", action="store_true", help="Try and force stuff, even if TwitterHAL doesn't want to"
+        )
 
-        mutex = self.parser.add_mutually_exclusive_group()
-        mutex.add_argument("-r", "--run", action="store_true", help="Run the bot!")
-        mutex.add_argument("--chat", action="store_true", help="Chat with the bot")
-        mutex.add_argument("--stats", action="store_true", help="Display some stats")
-        mutex.add_argument("--print-config", action="store_true", help="Print current parsed config")
+        self.mutex = self.parser.add_mutually_exclusive_group()
+        self.mutex.add_argument("-r", "--run", action="store_true", help="Run the bot!")
+        self.mutex.add_argument("--chat", action="store_true", help="Chat with the bot")
+        self.mutex.add_argument("--stats", action="store_true", help="Display some stats")
+        self.mutex.add_argument("--print-config", action="store_true", help="Print current parsed config")
 
     def __enter__(self):
         self.setup()
@@ -54,13 +57,13 @@ class CommandLine:
         else:
             logger = init_logging()
 
-        self.init_megahal = self.args.run or self.args.stats or self.args.chat
+        self.init_megahal = self.args.run or self.args.chat
 
     def run(self, *args, **kwargs):
         if self.init_megahal:
             print("Initializing MegaHAL, this could take a moment ...")
 
-        with self.TwitterHAL(init_megahal=self.init_megahal) as self.hal:
+        with self.TwitterHAL(init_megahal=self.init_megahal, force=self.args.force) as self.hal:
             if self.args.chat:
                 self.hal.megahal.interact()
             elif self.args.stats:
@@ -69,17 +72,25 @@ class CommandLine:
                 print(settings)
             elif self.args.run:
                 run(self.hal)
-            else:
+            elif not self.run_extra():
                 self.parser.print_help()
 
+    def run_extra(self, *args, **kwargs):
+        """
+        Plug in your extra runners here. Make sure this returns True if any
+        of them were applicable and run.
+        """
+        return False
+
     def print_stats(self, *args, **kwargs):
-        print("Posted random tweets: %d" % len(self.hal.db.posted_tweets.original_posts))
-        print("Earliest random tweet date: %s" % self.hal.db.posted_tweets.original_posts.earliest_date)
-        print("Latest random tweet date: %s" % self.hal.db.posted_tweets.original_posts.latest_date)
-        print("Posted reply tweets: %d" % len(self.hal.db.posted_tweets.replies))
-        print("Earliest random tweet date: %s" % self.hal.db.posted_tweets.replies.earliest_date)
-        print("Latest random tweet date: %s" % self.hal.db.posted_tweets.replies.latest_date)
-        print("Size of brain: %d" % self.hal.megahal.brainsize)
+        print("Posted random tweets:         %d" % len(self.hal.db.posted_tweets.original_posts))
+        print("  - earliest date:            %s" % self.hal.db.posted_tweets.original_posts.earliest_date)
+        print("  - latest date:              %s" % self.hal.db.posted_tweets.original_posts.latest_date)
+        print("Posted reply tweets:          %d" % len(self.hal.db.posted_tweets.replies))
+        print("  - earliest date:            %s" % self.hal.db.posted_tweets.replies.earliest_date)
+        print("  - latest date:              %s" % self.hal.db.posted_tweets.replies.latest_date)
+        print("Mentions:                     %d" % len(self.hal.db.mentions))
+        print("  - unanswered:               %d" % len(self.hal.db.mentions.unanswered))
 
 
 def main():

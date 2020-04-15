@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import emoji
 
+
 if TYPE_CHECKING:
     from typing import List
 

@@ -1,8 +1,7 @@
-from typing import Type, TypeVar
+from argparse import ArgumentParser, Namespace, _MutuallyExclusiveGroup
+from typing import Type
 
-from twitterhal import TwitterHAL
-
-TH = TypeVar("TH", bound=TwitterHAL)
+import twitterhal
 
 
 def init_logging(loglevel: int):
@@ -14,13 +13,23 @@ def main():
 
 
 class CommandLine:
-    def __init__(self, twitterhal_class: Type[TH]):
+    args: Namespace
+    init_megahal: bool
+    parser: ArgumentParser
+    mutex: _MutuallyExclusiveGroup
+    TwitterHAL: Type[twitterhal.TwitterHAL]
+    hal: twitterhal.TwitterHAL
+
+    def __init__(self, twitterhal_class: Type[twitterhal.TwitterHAL]):
         ...
 
     def print_stats(self, *args, **kwargs):
         ...
 
     def run(self, *args, **kwargs):
+        ...
+
+    def run_extra(self, *args, **kwargs) -> bool:
         ...
 
     def setup(self, *args, **kwargs):

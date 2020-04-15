@@ -29,6 +29,7 @@ class TwitterHAL:
     exit_event: threading.Event
     generate_random_lock: threading.Lock
     megahal_open: bool
+    force: bool
 
     def __init__(
         self,
@@ -36,6 +37,7 @@ class TwitterHAL:
         random_post_times: Optional[Sequence[datetime.time]],
         include_mentions: Optional[bool],
         init_megahal: bool,
+        force: bool,
         **kwargs
     ):
         ...
