@@ -69,11 +69,13 @@ class TwitterHAL:
     def get_twitter_api_kwargs(self, **kwargs):
         defaults = deepcopy(settings.TWITTER_API)
         defaults.update(kwargs)
+        logger.debug(defaults)
         return defaults
 
     def get_megahal_api_kwargs(self, **kwargs):
         defaults = deepcopy(settings.MEGAHAL_API)
         defaults.update(kwargs)
+        logger.debug(defaults)
         return defaults
 
     def __enter__(self):
@@ -205,11 +207,13 @@ class TwitterHAL:
             if limit.reset and limit.reset <= time.time():
                 self.api.InitializeRateLimit()
                 limit = self.api.CheckRateLimit(url)
+        logger.debug("limit.remaining: %d, count: %d", limit.remaining, count)
         return limit.remaining >= count
 
     def can_post(self, count=1):
         if self.post_status_limit.reset <= time.time():
             self._set_post_status_limit()
+        logger.debug("self.post_status_limit.remaining: %d, count: %d", self.post_status_limit.remaining, count)
         return self.post_status_limit.remaining >= count
 
     def generate_tweet(self, in_reply_to=None):
@@ -257,6 +261,7 @@ class TwitterHAL:
             text=prefix + reply.text,
             in_reply_to_status_id=in_reply_to.id if in_reply_to is not None else None
         )
+        logger.debug("Generated: %s", tweet)
         return tweet
 
     def init_db(self):
@@ -354,6 +359,7 @@ class TwitterHAL:
             reset = int(time.time()) + POST_STATUS_LIMIT_RESET_FREQUENCY
             remaining = POST_STATUS_LIMIT - subtract
         self.post_status_limit = EndpointRateLimit(limit=POST_STATUS_LIMIT, remaining=remaining, reset=reset)
+        logger.debug("Set self.post_status_limit: %s", self.post_status_limit)
 
     def _time_for_random_post(self):
         # Find the item in self.random_post_times that is closest to the
