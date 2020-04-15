@@ -25,7 +25,7 @@ class DatabaseItem:
 
 class Database:
     """Wrapper for typed `shelve` DB storing TwitterHAL data."""
-    def __init__(self, db_name="twitterhal", writeback=False, keep_synced=True):
+    def __init__(self, db_name="twitterhal", writeback=True, keep_synced=True):
         """Initialize the DB.
 
         Args:
@@ -33,7 +33,7 @@ class Database:
                 extension. Default: "twitterhal"
             writeback (bool, optional): Whether to open the shelve with
                 writeback, see https://docs.python.org/3.7/library/shelve.html.
-                Default: False
+                Default: True
             keep_synced (bool, optional): If True, will sync the DB to disk
                 every time a value is altered. May slow things down with large
                 databases. If False, you will have to ensure that it always
@@ -61,9 +61,8 @@ class Database:
         self.close()
 
     def __setattr__(self, name, value):
-        if not name.startswith("_"):
+        if not name.startswith("_") and self.__is_open:
             with self.__lock:
-                assert self.__is_open, "Database is not open; run open() first"
                 assert name in self.__schema, "Key %s not present in DB schema" % name
                 self.__schema[name].value = value
                 self.__db[name] = value
@@ -73,10 +72,10 @@ class Database:
 
     def open(self):
         with self.__lock:
-            self.__is_open = True
             self.__db = shelve.open(self.__db_name, writeback=self.__writeback)
             for k, v in self.__schema.items():
                 setattr(self, k, self.__db.get(k, v.value))
+            self.__is_open = True
 
     def close(self):
         with self.__lock:
@@ -94,13 +93,12 @@ class Tweet(Status):
     Not dependent on whether we run 'extended mode' or not; self.text will
     contain status.full_text if available, otherwise status.text.
 
-    self.filtered_text: tweet text filtered by utils.strip_phrase()
+    self.filtered_text: tweet text filtered by utils.strip_phrase().
 
-    self.is_* are boolean flags usable for different categories of tweets:
-    self.is_answered - tweet that mentions us, to denote whether it's been
-        answered
-    self.is_processed - incoming tweet, to denote whether it's been processed
-        and learnt by MegaHAL
+    self.is_answered: tweet that mentions us, to denote whether it's been
+        answered.
+    self.is_processed: does not actually hold any meaning by default, but may
+        be used for whatever purpose.
     """
 
     def __init__(self, is_answered=False, is_processed=False, filtered_text=None, **kwargs):
@@ -208,7 +206,8 @@ class TweetList(UserList):
         Tweet language is decided by the `detectlanguage` API:
         https://detectlanguage.com/
 
-        Requires that detectlanguage.configuration.api_key has been set.
+        If detectlanguage.configuration.api_key has not already been set, tries
+        to get it from settings.DETECTLANGUAGE_API_KEY.
         """
         import detectlanguage
         if detectlanguage.configuration.api_key is None:
