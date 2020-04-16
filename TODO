@@ -1,0 +1,3 @@
+Jämka ihop megahal.util med twitterhal.util (t.ex. strip_phrase)
+
+Se till så inte sådana funktioner körs flera ggr i onödan

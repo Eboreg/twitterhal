@@ -5,6 +5,7 @@ from email.utils import formatdate
 from threading import RLock
 
 from Levenshtein import ratio  # pylint: disable=no-name-in-module
+from megahal.megahal import Reply
 from twitter.models import Status
 
 from twitterhal.conf import settings
@@ -116,6 +117,9 @@ class Tweet(Status):
         if issubclass(other.__class__, Status):
             return self.id == other.id
         return False
+
+    def __str__(self):
+        return repr(self)
 
     @classmethod
     def from_status(cls, status):
@@ -261,6 +265,8 @@ class TweetList(UserList):
         """
         if isinstance(item, Tweet):
             string = item.filtered_text
+        elif isinstance(item, Reply):
+            string = item.text
         elif isinstance(item, Status):
             string = strip_phrase(item.full_text or item.text)
         elif isinstance(item, str):
