@@ -287,7 +287,7 @@ class TwitterHAL:
     def post_from_queue(self):
         """Post all queued Tweets
 
-        Not used in the regular loop, exists more like a little helper for
+        Not used in the daemon loop, exists more like a little helper for
         those who may want it. Simply loops through the internal queue of
         Tweets and posts them.
         """
@@ -297,6 +297,15 @@ class TwitterHAL:
                 break
             tweet: "Tweet" = self.queue.get()
             logger.info("Got from queue: %s", tweet)
+            self._post_tweet(tweet)
+
+    def post_random_tweet(self):
+        """Post a new random Tweet
+
+        Not used in the daemon loop. Just posts a new random Tweet on demand.
+        """
+        tweet = self.generate_tweet()
+        if self.force or self.can_post():
             self._post_tweet(tweet)
 
     """ ---------- PRIVATE HELPER METHODS ---------- """
