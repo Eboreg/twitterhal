@@ -56,7 +56,7 @@ class TwitterHAL:
 
         # Set up runtime stuff
         Database = settings.get_database_class()
-        self.db = cast("DBInstance", Database())
+        self.db = cast("DBInstance", Database(db_path=settings.DATABASE_FILE))
         self.queue = queue.Queue()
         self.exit_event = threading.Event()
         self.generate_random_lock = threading.Lock()
@@ -93,8 +93,7 @@ class TwitterHAL:
             self.api = twitter.Api(**self.get_twitter_api_kwargs())
             self.api.InitializeRateLimit()
         except Exception as e:
-            logger.error(str(e), exc_info=True)
-            raise e
+            logger.error(str(e))
         self.init_db()
         self._init_post_status_limit()
         logger.info("Ready!")
@@ -177,7 +176,7 @@ class TwitterHAL:
                 [Tweet.from_status(m) for m in self.api.GetMentions() if m not in self.db.mentions]
             )
         except twitter.TwitterError as e:
-            logger.error(str(e), exc_info=True)
+            logger.error(str(e))
             return TweetList()
         else:
             for mention in self.db.mentions.unanswered:
@@ -330,8 +329,8 @@ class TwitterHAL:
         try:
             status = self.api.PostUpdate(
                 tweet.filtered_text, in_reply_to_status_id=tweet.in_reply_to_status_id)
-        except Exception as e:
-            logger.error(str(e), exc_info=True)
+        except twitter.TwitterError as e:
+            logger.error(str(e))
         else:
             # Logging the request here, since I guess it counts towards
             # the rate limit whether we succeed or not

@@ -25,11 +25,11 @@ class DatabaseItem:
 
 class Database:
     """Wrapper for typed `shelve` DB storing TwitterHAL data."""
-    def __init__(self, db_name="twitterhal", writeback=True, keep_synced=True):
+    def __init__(self, db_path="twitterhal", writeback=True, keep_synced=True):
         """Initialize the DB.
 
         Args:
-            db_name (str, optional): Name of the .db file on disk, without
+            db_path (str, optional): Path to the .db file on disk, without
                 extension. Default: "twitterhal"
             writeback (bool, optional): Whether to open the shelve with
                 writeback, see https://docs.python.org/3.7/library/shelve.html.
@@ -42,7 +42,7 @@ class Database:
         self.__writeback = writeback
         self.__keep_synced = keep_synced
         self.__is_open = False
-        self.__db_name = db_name
+        self.__db_path = db_path
         self.__lock = RLock()
         self.__schema = {
             "posted_tweets": DatabaseItem("posted_tweets", TweetList, TweetList(unique=True)),
@@ -72,7 +72,7 @@ class Database:
 
     def open(self):
         with self.__lock:
-            self.__db = shelve.open(self.__db_name, writeback=self.__writeback)
+            self.__db = shelve.open(self.__db_path, writeback=self.__writeback)
             for k, v in self.__schema.items():
                 setattr(self, k, self.__db.get(k, v.value))
             self.__is_open = True

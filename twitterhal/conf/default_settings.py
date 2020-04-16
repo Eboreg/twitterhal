@@ -8,6 +8,7 @@ SCREEN_NAME = ""
 RANDOM_POST_TIMES = [datetime.time(8), datetime.time(16), datetime.time(22)]
 INCLUDE_MENTIONS = False
 DATABASE_CLASS = "twitterhal.models.Database"
+DATABASE_FILE = "twitterhal"
 DETECTLANGUAGE_API_KEY = ""
 
 TWITTER_API = {
