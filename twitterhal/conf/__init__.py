@@ -1,5 +1,6 @@
 import importlib
 import os
+import sys
 import warnings
 from copy import deepcopy
 from types import ModuleType
@@ -42,6 +43,7 @@ class Settings:
     environment variable "TWITTERHAL_SETTINGS_MODULE" to the path of your
     settings module, and it will be taken care of for you.
     """
+
     def __init__(self):
         self.is_setup = False
         self.default_settings = {}
@@ -65,7 +67,11 @@ class Settings:
 
         if settings_module:
             if isinstance(settings_module, str):
-                settings_module = importlib.import_module(settings_module)
+                try:
+                    settings_module = importlib.import_module(settings_module)
+                except ModuleNotFoundError:
+                    sys.path.append(os.getcwd())
+                    settings_module = importlib.import_module(settings_module)
             for setting in dir(settings_module):
                 if setting.isupper():
                     setattr(self, setting, getattr(settings_module, setting))
