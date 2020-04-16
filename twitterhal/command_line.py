@@ -36,6 +36,7 @@ class CommandLine:
         self.mutex.add_argument("--chat", action="store_true", help="Chat with the bot")
         self.mutex.add_argument("--stats", action="store_true", help="Display some stats")
         self.mutex.add_argument("--print-config", action="store_true", help="Print current parsed config")
+        self.mutex.add_argument("--post-random", action="store_true", help="Post a new random tweet")
 
     def __enter__(self):
         self.setup()
@@ -57,7 +58,7 @@ class CommandLine:
         else:
             logger = init_logging()
 
-        self.init_megahal = self.args.run or self.args.chat
+        self.init_megahal = self.args.run or self.args.chat or self.args.post_random
 
     def run(self, *args, **kwargs):
         if self.init_megahal:
@@ -70,6 +71,8 @@ class CommandLine:
                 self.print_stats()
             elif self.args.print_config:
                 print(settings)
+            elif self.args.post_random:
+                self.hal.post_random_tweet()
             elif self.args.run:
                 run(self.hal)
             elif not self.run_extra():
