@@ -25,7 +25,8 @@ class TwitterHAL:
     random_post_times: Sequence[datetime.time]
     include_mentions: bool
     db: DBInstance
-    queue: queue.Queue
+    post_queue: queue.Queue[Tweet]
+    mention_queue: queue.Queue[Tweet]
     exit_event: threading.Event
     generate_random_lock: threading.Lock
     megahal_open: bool
@@ -38,11 +39,12 @@ class TwitterHAL:
         include_mentions: Optional[bool],
         init_megahal: bool,
         force: bool,
+        test: bool,
         **kwargs
     ):
         ...
 
-    def __enter__(self) -> TwitterHAL:
+    def __enter__(self) -> "TwitterHAL":
         ...
 
     def __exit__(self, *args, **kwargs):

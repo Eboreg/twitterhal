@@ -10,6 +10,7 @@ INCLUDE_MENTIONS = False
 DATABASE_CLASS = "twitterhal.models.Database"
 DATABASE_FILE = "twitterhal"
 DETECTLANGUAGE_API_KEY = ""
+RUNNER_SLEEP_SECONDS = 5  # TODO: Document
 
 TWITTER_API = {
     "consumer_key": "",

@@ -1,3 +1,6 @@
-Jämka ihop megahal.util med twitterhal.util (t.ex. strip_phrase)
+Se till så inte hjälpfunktioner typ strip_phrase körs flera ggr i onödan
 
-Se till så inte sådana funktioner körs flera ggr i onödan
+Skaffa ngn struktur på var och när olika kollar görs och när och var
+saker loggas.
+
+Vad är det för jävla segfault ipython spottar ur sig?

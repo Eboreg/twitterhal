@@ -2,7 +2,8 @@ import argparse
 import logging
 
 from twitterhal.conf import settings
-from twitterhal.engine import TwitterHAL, run
+from twitterhal.engine import TwitterHAL
+from twitterhal.runtime import runner
 
 
 def init_logging(loglevel=logging.ERROR):
@@ -29,6 +30,9 @@ class CommandLine:
         )
         self.parser.add_argument(
             "-f", "--force", action="store_true", help="Try and force stuff, even if TwitterHAL doesn't want to"
+        )
+        self.parser.add_argument(
+            "-t", "--test", action="store_true", help="Test mode; doesn't actually post anything"
         )
 
         self.mutex = self.parser.add_mutually_exclusive_group()
@@ -64,7 +68,7 @@ class CommandLine:
         if self.init_megahal:
             print("Initializing MegaHAL, this could take a moment ...")
 
-        with self.TwitterHAL(init_megahal=self.init_megahal, force=self.args.force) as self.hal:
+        with self.TwitterHAL(init_megahal=self.init_megahal, force=self.args.force, test=self.args.test) as self.hal:
             if self.args.chat:
                 self.hal.megahal.interact()
             elif self.args.stats:
@@ -74,7 +78,7 @@ class CommandLine:
             elif self.args.post_random:
                 self.hal.post_random_tweet()
             elif self.args.run:
-                run(self.hal)
+                runner.run()
             elif not self.run_extra():
                 self.parser.print_help()
 
