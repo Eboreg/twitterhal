@@ -2,6 +2,8 @@
 
 A MegaHAL Twitter bot in Python.
 
+**This project is in alpha, and NOT considered stable in any way.**
+
 ## Prerequisites
 
 * Python 3
