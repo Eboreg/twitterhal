@@ -65,9 +65,6 @@ class CommandLine:
         self.init_megahal = self.args.run or self.args.chat or self.args.post_random
 
     def run(self, *args, **kwargs):
-        if self.init_megahal:
-            print("Initializing MegaHAL, this could take a moment ...")
-
         with self.TwitterHAL(init_megahal=self.init_megahal, force=self.args.force, test=self.args.test) as self.hal:
             if self.args.chat:
                 self.hal.megahal.interact()

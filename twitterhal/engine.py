@@ -150,7 +150,7 @@ class TwitterHAL:
     @property
     def megahal(self):
         if not self.megahal_open:
-            logger.info("Initializing MegaHAL ...")
+            logger.info("Initializing MegaHAL, this could take a moment ...")
             self._megahal = MegaHAL(**self.get_megahal_api_kwargs())
             self.megahal_open = True
         return self._megahal
