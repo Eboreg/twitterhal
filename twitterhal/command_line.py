@@ -51,9 +51,7 @@ class CommandLine:
 
     def setup(self, *args, **kwargs):
         self.args = self.parser.parse_args()
-
         settings.setup(settings_module=self.args.settings_module)
-
         if self.args.debug:
             logger = init_logging(logging.DEBUG)
             logger.debug("TESTING DEBUG LOGGING")
@@ -61,41 +59,47 @@ class CommandLine:
             logger = init_logging(logging.INFO)
         else:
             logger = init_logging()
-
         self.init_megahal = self.args.run or self.args.chat or self.args.post_random
 
+    def get_hal_kwargs(self):
+        return {"init_megahal": self.init_megahal, "force": self.args.force, "test": self.args.test}
+
     def run(self, *args, **kwargs):
-        with self.TwitterHAL(init_megahal=self.init_megahal, force=self.args.force, test=self.args.test) as self.hal:
-            if self.args.chat:
-                self.hal.megahal.interact()
-            elif self.args.stats:
-                self.print_stats()
-            elif self.args.print_config:
-                print(settings)
-            elif self.args.post_random:
-                self.hal.post_random_tweet()
-            elif self.args.run:
+        if self.args.chat:
+            with self.TwitterHAL(**self.get_hal_kwargs()) as hal:
+                hal.megahal.interact()
+        elif self.args.stats:
+            with self.TwitterHAL(**self.get_hal_kwargs()) as hal:
+                self.print_stats(hal)
+        elif self.args.print_config:
+            print(settings)
+        elif self.args.post_random:
+            with self.TwitterHAL(**self.get_hal_kwargs()) as hal:
+                hal.post_random_tweet()
+        elif self.args.run:
+            with self.TwitterHAL(**self.get_hal_kwargs()) as hal:
                 runner.sleep_seconds = settings.RUNNER_SLEEP_SECONDS
                 runner.run()
-            elif not self.run_extra():
-                self.parser.print_help()
+        elif not self.run_extra():
+            self.parser.print_help()
 
     def run_extra(self, *args, **kwargs):
         """
         Plug in your extra routines here. Make sure this returns True if any
-        of them were applicable and run.
+        of them were applicable and run. And wrap them in
+        `self.TwitterHAL(**self.get_hal_kwargs()) as hal` if so is required.
         """
         return False
 
-    def print_stats(self, *args, **kwargs):
-        print("Posted random tweets:         %d" % len(self.hal.db.posted_tweets.original_posts))
-        print("  - earliest date:            %s" % self.hal.db.posted_tweets.original_posts.earliest_date)
-        print("  - latest date:              %s" % self.hal.db.posted_tweets.original_posts.latest_date)
-        print("Posted reply tweets:          %d" % len(self.hal.db.posted_tweets.replies))
-        print("  - earliest date:            %s" % self.hal.db.posted_tweets.replies.earliest_date)
-        print("  - latest date:              %s" % self.hal.db.posted_tweets.replies.latest_date)
-        print("Mentions:                     %d" % len(self.hal.db.mentions))
-        print("  - unanswered:               %d" % len(self.hal.db.mentions.unanswered))
+    def print_stats(self, hal, **kwargs):
+        print("Posted random tweets:         %d" % len(hal.db.posted_tweets.original_posts))
+        print("  - earliest date:            %s" % hal.db.posted_tweets.original_posts.earliest_date)
+        print("  - latest date:              %s" % hal.db.posted_tweets.original_posts.latest_date)
+        print("Posted reply tweets:          %d" % len(hal.db.posted_tweets.replies))
+        print("  - earliest date:            %s" % hal.db.posted_tweets.replies.earliest_date)
+        print("  - latest date:              %s" % hal.db.posted_tweets.replies.latest_date)
+        print("Mentions:                     %d" % len(hal.db.mentions))
+        print("  - unanswered:               %d" % len(hal.db.mentions.unanswered))
 
 
 def main():
