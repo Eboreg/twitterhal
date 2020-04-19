@@ -11,27 +11,22 @@ T = TypeVar("T")
 
 
 class DatabaseItem:
-    def __init__(self, name: str, type_: Type[T], default_value: T):
-        ...
-
-    def __setattr__(self, name: str, value: T):
-        ...
+    def __init__(self, name: str, type_: Type[T], default_value: T): ...
+    def __setattr__(self, name: str, value: T): ...
 
 
 class Database:
-    __writeback: bool
-    __keep_synced: bool
-    __is_open: bool
     __db_name: str
-    __lock: RLock
     __db: DbfilenameShelf
+    __is_open: bool
+    __lock: RLock
     __schema: Dict[str, DatabaseItem]
 
-    def __init__(self, db_name: str, writeback: bool, keep_synced: bool):
-        ...
-
-    def add_key(self, name: str, type_: Type[T], default: T):
-        ...
+    def __init__(self, db_name: str): ...
+    def add_key(self, name: str, type_: Type[T], default: T): ...
+    def close(self): ...
+    def open(self): ...
+    def sync(self): ...
 
 
 class Tweet(Status):
@@ -44,48 +39,29 @@ class Tweet(Status):
     is_processed: bool
     text: str
 
-    def __init__(self, is_answered: bool, is_processed: bool, filtered_text: Optional[str], **kwargs):
-        ...
-
-    def __eq__(self, other: Any) -> bool:
-        ...
-
-    def __setattr__(self, name: str, value: Any):
-        ...
-
+    def __eq__(self, other: Any) -> bool: ...
+    def __init__(self, is_answered: bool, is_processed: bool, filtered_text: Optional[str], **kwargs): ...
+    def __setattr__(self, name: str, value: Any): ...
     @classmethod
-    def from_status(cls, status: Status):
-        ...
+    def from_status(cls, status: Status) -> "Tweet": ...
 
 
 class TweetList(UserList, Iterable[Tweet]):
-    data: List[Tweet]
-    unique: bool
-    earliest_ts: int
-    latest_ts: int
-    earliest_date: Optional[datetime]
-    latest_date: Optional[datetime]
-    processed: TweetList
-    non_processed: TweetList
     answered: TweetList
-    unanswered: TweetList
+    data: List[Tweet]
+    earliest_date: Optional[datetime]
+    earliest_ts: int
+    latest_date: Optional[datetime]
+    latest_ts: int
+    non_processed: TweetList
     original_posts: TweetList
+    processed: TweetList
     replies: TweetList
+    unanswered: TweetList
+    unique: bool
 
-    def __init__(self, initlist: Optional[List[Tweet]], unique: bool):
-        ...
-
-    def get_by_id(self, id: int) -> Optional[Tweet]:
-        ...
-
-    def only_in_language(self, language_code: str) -> TweetList:
-        ...
-
-    def older_than(self, t: Union[float, int, datetime]) -> TweetList:
-        ...
-
-    def remove_older_than(self, t: Union[float, int, datetime]) -> int:
-        ...
-
-    def fuzzy_duplicates(self, item: Union[str, Tweet, Status]) -> TweetList:
-        ...
+    def __init__(self, initlist: Optional[List[Tweet]], unique: bool): ...
+    def fuzzy_duplicates(self, item: Union[str, Tweet, Status]) -> TweetList: ...
+    def get_by_id(self, id: int) -> Optional[Tweet]: ...
+    def only_in_language(self, language_code: str) -> TweetList: ...
+    def remove_older_than(self, t: Union[float, int, datetime]) -> int: ...

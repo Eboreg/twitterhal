@@ -1,10 +1,13 @@
 import logging
 
 from twitterhal.command_line import init_logging
+from twitterhal.conf import settings
 from twitterhal.gracefulkiller import killer
-from twitterhal.runtime import runner
+from twitterhal.runtime import Runner
+
 
 logger = init_logging(logging.DEBUG)
+runner = Runner(settings.RUNNER_SLEEP_SECONDS)
 
 
 def worker():

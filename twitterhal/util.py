@@ -8,20 +8,23 @@ from megahal.util import split_to_sentences
 
 
 if TYPE_CHECKING:
-    from typing import List
+    from typing import List, Pattern
 
 
-EMOJI_REGEX = emoji.get_emoji_regexp()
-URL_REGEX = r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+emoji_pattern: "Pattern[str]" = emoji.get_emoji_regexp()
+url_pattern = re.compile(
+    r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
+    flags=re.IGNORECASE
+)
 
 
 def strip_phrase(phrase: str) -> str:
     # Strip emojis
-    phrase = re.sub(EMOJI_REGEX, "", phrase)
+    phrase = emoji_pattern.sub("", phrase)
     # Unescape HTML entities
     phrase = html.unescape(phrase)
     # Strip URLs and mentions
-    phrase = re.sub(URL_REGEX, "", phrase, flags=re.IGNORECASE)
+    phrase = url_pattern.sub("", phrase)
     phrase = re.sub(r"@\w+", "", phrase)
     # Strip hashtags
     phrase = re.sub(r"#\w+", "", phrase)

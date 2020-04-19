@@ -1,4 +1,4 @@
-from twitterhal.engine import TwitterHAL, run
+from twitterhal.engine import TwitterHAL
 
 
-__all__ = ["TwitterHAL", "run"]
+__all__ = ["TwitterHAL"]

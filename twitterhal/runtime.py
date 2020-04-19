@@ -4,8 +4,8 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from typing import TYPE_CHECKING
 
-from twitterhal.conf import settings
 from twitterhal.gracefulkiller import killer
+
 
 logger = logging.getLogger(__name__)
 
@@ -137,4 +137,4 @@ class Runner:
             logger.info("Waiting for threads to finish ...")
 
 
-runner: "Runner" = Runner(settings.RUNNER_SLEEP_SECONDS)
+runner: "Runner" = Runner(5)

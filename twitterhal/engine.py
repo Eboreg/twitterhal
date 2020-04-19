@@ -5,9 +5,8 @@ import re
 import threading
 import time
 import warnings
-from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from typing import cast, Union
+from typing import Union, cast
 
 import twitter
 from megahal import MegaHAL
@@ -19,15 +18,13 @@ from twitterhal.gracefulkiller import killer
 from twitterhal.models import Tweet, TweetList
 from twitterhal.runtime import runner
 
-logger = logging.getLogger(__name__)
 
-POST_STATUS_LIMIT = 300
-POST_STATUS_LIMIT_RESET_FREQUENCY = 3 * 60 * 60
+logger = logging.getLogger(__name__)
 
 
 class TwitterHAL:
     def __init__(
-        self, screen_name=None, random_post_times=None, include_mentions=None,
+        self, screen_name=None, random_post_times=None, include_mentions=False,
         init_megahal=False, force=False, test=False, **kwargs
     ):
         """Initialize the bot.
@@ -50,31 +47,28 @@ class TwitterHAL:
                 doesn't want to. Default: False
             test (bool, optional): Test mode; don't actually post anything.
                 Default: False
-
-        TODO: Populate mention_queue with unanswered mentions on start
-        TODO: Testa om killer.kill_now funkar, skrota isf exit_event
         """
         # Take care of settings
-        self.screen_name = screen_name or settings.SCREEN_NAME
-        self.random_post_times = random_post_times or settings.RANDOM_POST_TIMES
+        db_path = "test" if test else settings.DATABASE_FILE
+        Database = settings.get_database_class()
         self.include_mentions = include_mentions or settings.INCLUDE_MENTIONS
+        self.random_post_times = random_post_times or settings.RANDOM_POST_TIMES
+        self.screen_name = screen_name or settings.SCREEN_NAME
 
         # Set up runtime stuff
-        Database = settings.get_database_class()
-        db_path = "test" if test else settings.DATABASE_FILE
         self.db = cast("DBInstance", Database(db_path=db_path))
-        self.post_queue = queue.Queue()
-        self.mention_queue = queue.Queue()
-        self.exit_event = threading.Event()
-        self.generate_random_lock = threading.Lock()
-        self.learn_phrases_lock = threading.Lock()
-        self.megahal_open = False
         self.force = force
+        self.generate_random_lock = threading.Lock()
+        self.megahal_open = False
+        self.mention_queue = queue.Queue()
+        self.post_queue = queue.Queue()
         self.test = test
         if self.test:
             logger.info("TEST MODE")
         if init_megahal:
             self.megahal
+
+    """ ---------- METHODS FOR SETTING UP STUFF ---------- """
 
     def __enter__(self):
         self.open()
@@ -94,8 +88,11 @@ class TwitterHAL:
         self.api.InitializeRateLimit()
         self.init_db()
         self._init_post_status_limit()
+        for mention in self.db.mentions.unanswered:
+            self.mention_queue.put(mention)
         self.register_workers()
         self.register_loop_tasks()
+        self.register_post_loop_tasks()
         logger.info("Ready!")
 
     def close(self):
@@ -108,12 +105,14 @@ class TwitterHAL:
 
     def register_workers(self):
         runner.register_worker(self.post_tweets_worker)
-        # runner.register_worker(self.get_new_mentions_worker)
 
     def register_loop_tasks(self):
         runner.register_loop_task(self.generate_random, sleep=60)
         runner.register_loop_task(self.get_new_mentions, sleep=15)
         runner.register_loop_task(self.pop_mention_and_generate_reply)
+
+    def register_post_loop_tasks(self):
+        pass
 
     def get_twitter_api_kwargs(self, **kwargs):
         defaults = deepcopy(settings.TWITTER_API)
@@ -165,7 +164,6 @@ class TwitterHAL:
         """
         if restart and self.generate_random_lock.locked():
             self.generate_random_lock.release()
-        # while not self.exit_event.is_set() or not self.post_queue.empty():
         while not killer.kill_now or not self.post_queue.empty():
             if self.force or self.can_post():
                 try:
@@ -178,21 +176,7 @@ class TwitterHAL:
                 self._post_tweet(tweet)
         logger.debug("Recevied exit event")
 
-    def get_new_mentions_worker(self):
-        # Maybe not use; see comments in runtime.py
-        # while not self.exit_event.is_set():
-        while not killer.kill_now:
-            if self.force or self.can_do_request("/statuses/mentions_timeline"):
-                try:
-                    tweets = [Tweet.from_status(m) for m in self.api.GetMentions() if m not in self.db.mentions]
-                except twitter.TwitterError as e:
-                    logger.error(str(e))
-                else:
-                    for mention in tweets:
-                        logger.info(f"Got new mention: {mention.text}")
-                    self.db.mentions.unanswered.extend(tweets)
-
-    """ ---------- OTHER METHODS TO BE USED IN "DAEMON" LOOP ---------- """
+    """ ---------- LOOP TASKS ---------- """
 
     def generate_random(self):
         """Generate a random tweet and put it in post_queue
@@ -212,23 +196,12 @@ class TwitterHAL:
             logger.debug(f"Putting random tweet in post_queue: {tweet}")
             self.post_queue.put(tweet)
 
-    def generate_reply(self, mention):
-        """Generate reply Tweet for a mention Tweet, put it in post_queue
-
-        Tweets in self.db.mentions are guaranteed to be unique, because that
-        TweetList has unique=True.
-        """
-        logger.debug(f"Generating reply to {mention.text}")
-        reply = self.generate_tweet(in_reply_to=mention)
-        logger.debug(f"Putting reply in post_queue: {reply}")
-        self.post_queue.put(reply)
-
     def get_new_mentions(self):
         """Fetch new (unanswered) Tweets mentioning us
 
         Add new mentions to self.db.mentions, if they are not already in there.
-        Then returns a TweetList of new mentions, where "new" actually means
-        "those we haven't answered yet".
+        Also add them to mention_queue, to be picked up by
+        pop_mention_and_generate_reply.
 
         TODO: Separate "new" from "unanswered" mentions?
         """
@@ -240,11 +213,10 @@ class TwitterHAL:
             logger.error(str(e))
             return TweetList()
         else:
+            self.db.mentions.extend(mentions)
             for mention in mentions:
                 logger.info(f"Got new mention: {mention.text}")
                 self.mention_queue.put(mention)
-                # TODO: Remove return?
-            return self.db.mentions.unanswered
 
     def pop_mention_and_generate_reply(self):
         """Get *one* Tweet from mention queue and generate a reply.
@@ -254,20 +226,24 @@ class TwitterHAL:
         Other implementations which may put things there will also have to
         ensure their uniqueness.
 
+        Reply is put in post_queue for post_tweets_worker to pick up.
+
         TODO: Ej optimalt, går det att lösa bättre? Kanske med en ny
         bool-flagga på TweetList? Fast det vore nog inte threading-safe.
         Kanske ska TweetList ha en intern queue?
-
-        TODO: Merge:a denna och generate_reply?
         """
         if self.force or self.can_post():
             try:
                 mention = self.mention_queue.get_nowait()
             except queue.Empty:
-                return
-            self.generate_reply(mention)
+                pass
+            else:
+                logger.debug(f"Generating reply to {mention.text}")
+                reply = self.generate_tweet(in_reply_to=mention)
+                logger.debug(f"Putting reply in post_queue: {reply}")
+                self.post_queue.put(reply)
 
-    """ ---------- VARIOUS PUBLIC METHODS ---------- """
+    """ ---------- PUBLIC METHODS USED BY WORKERS/TASKS ETC ---------- """
 
     def can_do_request(self, url, count=1):
         """Check if we can make request(s) to a given endpoint.
@@ -332,7 +308,7 @@ class TwitterHAL:
             prefix = ""
         phrase = in_reply_to.filtered_text if in_reply_to else ""
         reply = self.megahal.get_reply(phrase, max_length=CHARACTER_LIMIT - len(prefix))
-        while (not reply or self.db.posted_tweets.fuzzy_duplicates(reply)) and not killer.kill_now:
+        while (not reply or self.db.posted_tweets.fuzzy_duplicates(reply.text)) and not killer.kill_now:
             # If, for some reason, we got an empty or duplicate reply: keep
             # trying, but don't learn from the input again
             if not reply:
@@ -346,6 +322,8 @@ class TwitterHAL:
         )
         logger.debug(f"Generated: {tweet}")
         return tweet
+
+    """ ---------- HELPFUL (?) UTILITY METHODS ---------- """
 
     def post_from_queue(self):
         """Post all queued Tweets
@@ -424,7 +402,9 @@ class TwitterHAL:
                 original_tweet = self.db.mentions.get_by_id(tweet.in_reply_to_status_id)
                 if original_tweet:
                     original_tweet.is_answered = True
-            logger.info(f"Posted: {tweet}")
+                logger.info(f"Posted: {tweet} as reply to: {original_tweet}")
+            else:
+                logger.info(f"Posted: {tweet}")
         if not tweet.in_reply_to_status_id and self.generate_random_lock.locked():
             # This was a random tweet, so release lock (whether post
             # succeeded or not)
@@ -438,9 +418,9 @@ class TwitterHAL:
         else:
             # We don't actually know when the reset is due, so we cautiously
             # assume it's 3 hours from now
-            reset = int(time.time()) + POST_STATUS_LIMIT_RESET_FREQUENCY
-            remaining = POST_STATUS_LIMIT - subtract
-        self.post_status_limit = EndpointRateLimit(limit=POST_STATUS_LIMIT, remaining=remaining, reset=reset)
+            reset = int(time.time()) + settings.POST_STATUS_LIMIT_RESET_FREQUENCY
+            remaining = settings.POST_STATUS_LIMIT - subtract
+        self.post_status_limit = EndpointRateLimit(limit=settings.POST_STATUS_LIMIT, remaining=remaining, reset=reset)
         logger.debug(f"Set self.post_status_limit: {self.post_status_limit}")
 
     def _time_for_random_post(self):
@@ -462,29 +442,3 @@ class TwitterHAL:
         if last_random_post_time > (now - 24 * 60 * 60):
             return find_time_slot(last_random_post_time) != find_time_slot(time.time())
         return True
-
-
-def run(hal):
-    with ThreadPoolExecutor() as executor:
-        logger.info("Starting post_tweets_worker thread ...")
-        post_tweets_worker = executor.submit(hal.post_tweets_worker)
-        while not killer.kill_now:
-            logger.debug("Running generate_random and get_new_mentions ...")
-            executor.submit(hal.generate_random)
-            for mention in hal.get_new_mentions():
-                logger.debug(f"Submitting generate_reply for {mention}")
-                executor.submit(hal.generate_reply, mention)
-            killer.sleep(15)
-            if not post_tweets_worker.running():
-                exc = post_tweets_worker.exception()
-                if exc is not None:
-                    logger.error(f"post_tweets_worker raised exception: {exc!s}. Restarting ...")
-                else:
-                    logger.error("post_tweets_worker thread exited without exception! Restarting ...")
-                if hal.generate_random_lock.locked():
-                    hal.generate_random_lock.release()
-                post_tweets_worker = executor.submit(hal.post_tweets_worker)
-        logger.debug("Setting exit_event")
-        hal.exit_event.set()
-        logger.info("Waiting for threads to finish ...")
-    logger.info("Waiting for TwitterHAL to finish ...")

@@ -1,6 +1,111 @@
 Se till så inte hjälpfunktioner typ strip_phrase körs flera ggr i onödan
+(strip_phrase ser ej ut att göra det)
 
 Skaffa ngn struktur på var och när olika kollar görs och när och var
 saker loggas.
 
 Vad är det för jävla segfault ipython spottar ur sig?
+
+
+Exekveringsordning start:
+
+settings = conf.Settings()
+runner = runtime.Runner()
+CommandLine.__init__
+CommandLine.__enter__
+    .setup()
+        settings.setup()
+CommandLine.run
+    TwitterHAL.__init__
+        Database.__init__
+    TwitterHAL.__enter__
+        .open
+            twitter.Api()
+            .init_db
+                Database.open
+            .register_workers
+                runner.register_worker(self.post_tweets_worker)
+            .register_loop_tasks
+                runner.register_loop_task(self.generate_random, sleep=60)
+                runner.register_loop_task(self.get_new_mentions, sleep=15)
+                runner.register_loop_task(self.pop_mention_and_generate_reply)
+    runner.run
+        .start_workers
+        .run_loop_tasks
+        .restart_stopped_workers
+        .run_post_loop_tasks
+
+
+Exekveringsordning, random tweet:
+
+TwitterHAL.generate_random
+    ._time_for_random_post
+    .generate_random_lock.acquire
+    .generate_tweet
+        .get_megahal_api_kwargs
+            settings.MEGAHAL_API
+        MegaHAL.__init__
+            Brain.__init__
+        MegaHAL.get_reply
+            Brain.communicate
+                .get_words_from_phrase
+                .learn
+                .get_reply
+                    .get_replies
+                        .make_keywords
+                        .generate_replywords
+                        megahal.util.split_list_to_sentences
+                        megahal.util.capitalize
+                        levenshtein.ratio
+                        .evaluate_reply
+                        Reply.__init__
+        MegaHAL.get_reply_nolearn
+        Tweet.__init__
+            twitterhal.util.strip_phrase
+    post_queue.put
+TwitterHAL.post_tweets_worker
+    .can_post
+        ._set_post_status_limit
+    .post_queue.get
+    ._post_tweet
+        twitter.Api.PostUpdate
+        ._set_post_status_limit
+        .generate_random_lock.release
+
+
+Exekveringsordning, mention:
+
+TwitterHAL.get_new_mentions
+    .can_do_request
+    twitter.Api.GetMentions
+    Tweet.from_status
+        .__init__
+            twitterhal.util.strip_phrase
+    .mention_queue.put
+TwitterHAL.pop_mention_and_generate_reply
+    .can_post
+        ._set_post_status_limit
+    .mention_queue.get_nowait()
+    .generate_reply
+        .generate_tweet
+            .get_megahal_api_kwargs
+                settings.MEGAHAL_API
+            MegaHAL.__init__
+                Brain.__init__
+            MegaHAL.get_reply
+                Brain.communicate
+                    .get_words_from_phrase
+                    .learn
+                    .get_reply
+                        .get_replies
+                            .make_keywords
+                            .generate_replywords
+                            megahal.util.split_list_to_sentences
+                            megahal.util.capitalize
+                            levenshtein.ratio
+                            .evaluate_reply
+                            Reply.__init__
+            MegaHAL.get_reply_nolearn
+            Tweet.__init__
+                twitterhal.util.strip_phrase
+        .post_queue.put

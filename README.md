@@ -6,7 +6,7 @@ A MegaHAL Twitter bot in Python.
 
 ## Prerequisites
 
-* Python 3
+* Python >= 3.6
 * [My fork of Chris Jones' Python MegaHAL](https://github.com/Eboreg/megahal)
 * [bear/python-twitter](https://github.com/bear/python-twitter)
 * [carpedm20/emoji](https://github.com/carpedm20/emoji/)

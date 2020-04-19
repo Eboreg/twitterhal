@@ -5,7 +5,6 @@ from email.utils import formatdate
 from threading import RLock
 
 from Levenshtein import ratio  # pylint: disable=no-name-in-module
-from megahal.megahal import Reply
 from twitter.models import Status
 
 from twitterhal.conf import settings
@@ -26,22 +25,14 @@ class DatabaseItem:
 
 class Database:
     """Wrapper for typed `shelve` DB storing TwitterHAL data."""
-    def __init__(self, db_path="twitterhal", writeback=True, keep_synced=True):
+
+    def __init__(self, db_path="twitterhal"):
         """Initialize the DB.
 
         Args:
             db_path (str, optional): Path to the .db file on disk, without
                 extension. Default: "twitterhal"
-            writeback (bool, optional): Whether to open the shelve with
-                writeback, see https://docs.python.org/3.7/library/shelve.html.
-                Default: True
-            keep_synced (bool, optional): If True, will sync the DB to disk
-                every time a value is altered. May slow things down with large
-                databases. If False, you will have to ensure that it always
-                exits gracefully. Default: True
         """
-        self.__writeback = writeback
-        self.__keep_synced = keep_synced
         self.__is_open = False
         self.__db_path = db_path
         self.__lock = RLock()
@@ -67,24 +58,25 @@ class Database:
                 assert name in self.__schema, "Key %s not present in DB schema" % name
                 self.__schema[name].value = value
                 self.__db[name] = value
-                if self.__keep_synced:
-                    self.__db.sync()
         super().__setattr__(name, value)
 
     def open(self):
         with self.__lock:
-            self.__db = shelve.open(self.__db_path, writeback=self.__writeback)
+            self.__db = shelve.open(self.__db_path)
             for k, v in self.__schema.items():
                 setattr(self, k, self.__db.get(k, v.value))
             self.__is_open = True
 
     def close(self):
         with self.__lock:
+            self.sync()
             self.__db.close()
             self.__is_open = False
 
     def sync(self):
         with self.__lock:
+            for key in self.__schema.keys():
+                self.__db[key] = getattr(self, key)
             self.__db.sync()
 
 
@@ -117,6 +109,13 @@ class Tweet(Status):
         if issubclass(other.__class__, Status):
             return self.id == other.id
         return False
+
+    def __repr__(self):
+        if self.user:
+            return f"Tweet<id={self.id}, screen_name={self.user.screen_name}, created={self.created_at}, " + \
+                f"text={self.filtered_text}>"
+        else:
+            return f"<Tweet(id={self.id}, created={self.created_at}, text={self.filtered_text})>"
 
     def __str__(self):
         return repr(self)
@@ -228,19 +227,6 @@ class TweetList(UserList):
                 pass
         self.data = result
 
-    def older_than(self, t):
-        """Get TweetList of Tweets older than a given value.
-
-        Args:
-            t (float, int, datetime): Get all that are older than this; float
-                or int is interpreted as UNIX timestamps.
-        """
-        if isinstance(t, datetime):
-            t = t.timestamp()
-        if not isinstance(t, (int, float)):
-            raise ValueError("Argument must be a timestamp or datetime")
-        return self.__class__([tweet for tweet in self.data if tweet.created_at_in_seconds < t])
-
     def remove_older_than(self, t):
         """Clears the list of Tweets older than a given value.
 
@@ -263,12 +249,10 @@ class TweetList(UserList):
         """Return TweetList of Tweets whose text is sufficiently similar to
         `item` (Levenshtein ratio > 0.8)
         """
+        if isinstance(item, Status):
+            item = Tweet.from_status(item)
         if isinstance(item, Tweet):
             string = item.filtered_text
-        elif isinstance(item, Reply):
-            string = item.text
-        elif isinstance(item, Status):
-            string = strip_phrase(item.full_text or item.text)
         elif isinstance(item, str):
             string = strip_phrase(item)
         else:

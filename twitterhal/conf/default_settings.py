@@ -11,6 +11,8 @@ DATABASE_CLASS = "twitterhal.models.Database"
 DATABASE_FILE = "twitterhal"
 DETECTLANGUAGE_API_KEY = ""
 RUNNER_SLEEP_SECONDS = 5  # TODO: Document
+POST_STATUS_LIMIT = 300  # TODO: Document
+POST_STATUS_LIMIT_RESET_FREQUENCY = 3 * 60 * 60  # TODO: Document
 
 TWITTER_API = {
     "consumer_key": "",

@@ -78,13 +78,14 @@ class CommandLine:
             elif self.args.post_random:
                 self.hal.post_random_tweet()
             elif self.args.run:
+                runner.sleep_seconds = settings.RUNNER_SLEEP_SECONDS
                 runner.run()
             elif not self.run_extra():
                 self.parser.print_help()
 
     def run_extra(self, *args, **kwargs):
         """
-        Plug in your extra runners here. Make sure this returns True if any
+        Plug in your extra routines here. Make sure this returns True if any
         of them were applicable and run.
         """
         return False
@@ -103,3 +104,7 @@ class CommandLine:
 def main():
     with CommandLine() as cli:
         cli.run()
+
+
+if __name__ == "__main__":
+    main()
