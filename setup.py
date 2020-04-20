@@ -33,7 +33,8 @@ setuptools.setup(
     ],
     python_requires=">=3.6",
     install_requires=[
-        "megahal @ git+https://github.com/Eboreg/megahal",
+        # "megahal @ git+https://github.com/Eboreg/megahal",
+        "megahal>=0.3",
         "python-Levenshtein",
         "python-twitter",
         "emoji",
@@ -41,9 +42,9 @@ setuptools.setup(
     extras_require={
         "detectlanguage": ["detectlanguage"],
     },
-    dependency_links=[
-        "https://github.com/Eboreg/megahal/tarball/master#egg=megahal-0.3",
-    ],
+    # dependency_links=[
+    #     "https://github.com/Eboreg/megahal/tarball/master#egg=megahal-0.3",
+    # ],
     entry_points={
         "console_scripts": ["twitterhal=twitterhal.command_line:main"],
     }

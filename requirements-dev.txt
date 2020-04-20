@@ -5,3 +5,4 @@ https://github.com/matangover/mypyls/archive/master.zip#egg=mypyls[default-mypy]
 pipdeptree
 pylint
 rope
+twine
