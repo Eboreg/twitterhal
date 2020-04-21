@@ -14,8 +14,11 @@ def init_logging(loglevel=logging.ERROR):
 
 
 class CommandLine:
-    def __init__(self, twitterhal_class=TwitterHAL):
+    def __init__(self, twitterhal_class=TwitterHAL, settings_module=None):
         self.TwitterHAL = twitterhal_class
+
+        if settings_module:
+            settings.setup(settings_module=settings_module)
 
         self.parser = argparse.ArgumentParser(add_help=False)
         self.parser.add_argument(

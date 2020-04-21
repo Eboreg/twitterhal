@@ -19,11 +19,33 @@ But all those should be installed automatically by `pip` or `setup.py`. (`detect
 
 ### Command line
 
-`twitterhal -h` for usage.
+```shell
+$ twitterhal
+usage: twitterhal [-s SETTINGS_MODULE] [-d] [-m] [-f] [-t]
+                  [-r | --chat | --stats | --print-config | --post-random]
+
+optional arguments:
+  -s SETTINGS_MODULE, --settings SETTINGS_MODULE
+                        Python path to settings module. If omitted, we try
+                        looking for it in the 'TWITTERHAL_SETTINGS_MODULE'
+                        environment variable.
+  -d, --debug           More verbose logging output
+  -m, --include-mentions
+                        Include all mentions in replies (rather than just the
+                        handle we're replying to)
+  -f, --force           Try and force stuff, even if TwitterHAL doesn't want
+                        to
+  -t, --test            Test mode; doesn't actually post anything
+  -r, --run             Run the bot!
+  --chat                Chat with the bot
+  --stats               Display some stats
+  --print-config        Print current parsed config
+  --post-random         Post a new random tweet
+```
 
 `twitterhal --run` will post random tweets at `random_post_times` (see below), as well as answering all incoming mentions, all while trying its best not to exceed the [Twitter API rate limits](https://developer.twitter.com/en/docs/basics/rate-limits).
 
-### As a library:
+### As a library
 
 ```python
 from twitterhal import TwitterHAL
@@ -67,7 +89,9 @@ MEGAHAL_API = {
 
 `TWITTER_API` contains keyword arguments for `twitter.Api`. Read more about it [here](https://python-twitter.readthedocs.io/en/latest/twitter.html).
 
-`MEGAHAL` contains keyword arguments for `megahal.Megahal`. Consult that module for more info.
+`MEGAHAL` contains keyword arguments for `megahal.Megahal`. Consult [that module](https://pypi.org/project/megahal/) for more info.
+
+`RANDOM_POST_TIMES`: TwitterHAL will post a randomly generated tweet on those points of (local) time every day. Default: 8:00, 16:00, and 22:00 (that is 8 AM, 4 PM and 10 PM, for those of you stuck in antiquity).
 
 `INCLUDE_MENTIONS`: if `True`, TwitterHAL will include _all_ mentions in its replies. That is, not only the @handle of the user who wrote to it, but also every user they mentioned in their tweet. Perhaps you should use this carefully. Anyway, the default is `False`.
 
