@@ -132,7 +132,9 @@ class Runner:
             while not killer.kill_now:
                 self.run_loop_tasks()
                 self.restart_stopped_workers()
-                killer.sleep(self.sleep_seconds)
+                alarm = killer.sleep(self.sleep_seconds)
+                if alarm:
+                    logger.info("Pong!")
             self.run_post_loop_tasks()
             logger.info("Waiting for threads to finish ...")
 
