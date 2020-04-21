@@ -10,7 +10,7 @@ with open(os.path.join(os.path.dirname(__file__), "README.md"), "r") as readme:
 
 setuptools.setup(
     name="twitterhal",
-    version="0.3.2",
+    version="0.3.3",
     author="Robert Huselius",
     author_email="robert@huseli.us",
     description="A MegaHAL bot for Twitter",
