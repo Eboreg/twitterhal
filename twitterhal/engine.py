@@ -384,12 +384,12 @@ class TwitterHAL:
                     last_id = 0
                 status = twitter.Status(
                     id=last_id + 1,
-                    full_text=tweet.filtered_text,
+                    full_text=tweet.text,
                     in_reply_to_status_id=tweet.in_reply_to_status_id
                 )
             else:
                 status = self.api.PostUpdate(
-                    tweet.filtered_text, in_reply_to_status_id=tweet.in_reply_to_status_id)
+                    tweet.text, in_reply_to_status_id=tweet.in_reply_to_status_id)
         except twitter.TwitterError as e:
             logger.error(str(e))
         else:

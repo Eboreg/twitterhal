@@ -1,3 +1,6 @@
+Onödigt omständligt att vi först skapar en Tweet av megahal-output, sedan
+postar dess text, får en Status, och gör en ny Tweet av denna.
+
 Worker som regelbundet synkar, stänger o öppnar våra databaser
 
 Varna tydligare om man försöker använda detectlanguage och det ej finns
