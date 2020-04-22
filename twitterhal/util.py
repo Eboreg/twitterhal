@@ -16,6 +16,9 @@ url_pattern = re.compile(
     r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
     flags=re.IGNORECASE
 )
+# Tries its best to match hashtags as half-assedly defined by Twitter here:
+# https://help.twitter.com/en/using-twitter/replies-not-showing-up-and-hashtag-problems
+hashtag_pattern = re.compile(r"(?<!\S)(#(?!\d+(?:\s|$))\w+)")
 
 
 def strip_phrase(phrase: str) -> str:
@@ -27,7 +30,7 @@ def strip_phrase(phrase: str) -> str:
     phrase = url_pattern.sub("", phrase)
     phrase = re.sub(r"@\w+", "", phrase)
     # Strip hashtags
-    phrase = re.sub(r"#\w+", "", phrase)
+    phrase = hashtag_pattern.sub("", phrase)
     # Strip quotation marks
     phrase = re.sub(r"[”\"]", "", phrase)
     # Strip lines, stars & dots

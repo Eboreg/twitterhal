@@ -113,9 +113,9 @@ class Tweet(Status):
     def __repr__(self):
         if self.user:
             return f"Tweet<id={self.id}, screen_name={self.user.screen_name}, created={self.created_at}, " + \
-                f"text={self.filtered_text}>"
+                f"text={self.text}>"
         else:
-            return f"<Tweet(id={self.id}, created={self.created_at}, text={self.filtered_text})>"
+            return f"<Tweet(id={self.id}, created={self.created_at}, text={self.text})>"
 
     def __str__(self):
         return repr(self)

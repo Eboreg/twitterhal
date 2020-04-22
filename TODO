@@ -1,3 +1,5 @@
+Kontrollera härmning av input bättre
+
 Onödigt omständligt att vi först skapar en Tweet av megahal-output, sedan
 postar dess text, får en Status, och gör en ny Tweet av denna.
 

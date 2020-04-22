@@ -4,6 +4,8 @@ A MegaHAL Twitter bot in Python.
 
 **This project is in alpha, and NOT considered stable in any way.**
 
+Live examples (in Swedish): [@bibel3000](https://twitter.com/bibel3000), [@trendhal3000](https://twitter.com/trendhal3000)
+
 ## Prerequisites
 
 * Python >= 3.6
@@ -19,7 +21,7 @@ But all those should be installed automatically by `pip` or `setup.py`. (`detect
 
 ### Command line
 
-```shell
+```
 $ twitterhal
 usage: twitterhal [-s SETTINGS_MODULE] [-d] [-m] [-f] [-t]
                   [-r | --chat | --stats | --print-config | --post-random]

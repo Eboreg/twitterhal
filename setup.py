@@ -10,7 +10,7 @@ with open(os.path.join(os.path.dirname(__file__), "README.md"), "r") as readme:
 
 setuptools.setup(
     name="twitterhal",
-    version="0.4.0",
+    version="0.4.1",
     author="Robert Huselius",
     author_email="robert@huseli.us",
     description="A MegaHAL bot for Twitter",
@@ -33,7 +33,6 @@ setuptools.setup(
     ],
     python_requires=">=3.6",
     install_requires=[
-        # "megahal @ git+https://github.com/Eboreg/megahal",
         "megahal>=0.3",
         "python-Levenshtein",
         "python-twitter",
@@ -42,9 +41,6 @@ setuptools.setup(
     extras_require={
         "detectlanguage": ["detectlanguage"],
     },
-    # dependency_links=[
-    #     "https://github.com/Eboreg/megahal/tarball/master#egg=megahal-0.3",
-    # ],
     entry_points={
         "console_scripts": ["twitterhal=twitterhal.command_line:main"],
     }

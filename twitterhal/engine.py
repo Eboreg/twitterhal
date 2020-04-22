@@ -216,6 +216,7 @@ class TwitterHAL:
             self.db.mentions.extend(mentions)
             for mention in mentions:
                 logger.info(f"Got new mention: {mention.text}")
+                mention = self.process_new_mention(mention)
                 self.mention_queue.put(mention)
 
     def pop_mention_and_generate_reply(self):
@@ -275,7 +276,7 @@ class TwitterHAL:
         logger.debug(f"self.post_status_limit.remaining: {self.post_status_limit.remaining}, count: {count}")
         return self.post_status_limit.remaining >= count
 
-    def generate_tweet(self, in_reply_to=None):
+    def generate_tweet(self, in_reply_to=None, prefixes=[], suffixes=[]):
         """Generate a Tweet object
 
         Generate a new Tweet object from MegaHAL, with or without another Tweet
@@ -290,24 +291,38 @@ class TwitterHAL:
                 Tweet with handle of the sender and, optionally (if
                 self.include_mentions == True), the handles of all other
                 users mentioned.
+            prefixes (list of str, optional): List of strings that will be put
+                in the beginning of the generated Tweet, separated by space.
+                (NB: If this is a reply, the handle(s) of the repliee(s) will
+                be put in the very beginning, with these strings after)
+            suffixes (list of str, optional): List of strings that will be put
+                in the end of the generated Tweet, separated by space.
+                Hashtags maybe?
 
         Returns:
             models.Tweet object
         """
         start_time = datetime.datetime.now().time().isoformat("seconds")
         if in_reply_to:
-            prefixes = ["@" + in_reply_to.user.screen_name]
+            mentions = ["@" + in_reply_to.user.screen_name]
             if self.include_mentions:
-                prefixes += [
+                mentions += [
                     # Negative lookbehind to avoid matching email addresses
                     h for h in re.findall(r"(?<!\w)@[a-z0-9_]+", in_reply_to.text, flags=re.IGNORECASE)
                     if h.lower() not in ["@" + self.screen_name, "@" + in_reply_to.user.screen_name.lower()]
                 ]
+            prefix = " ".join(mentions + prefixes) + " "
+        elif prefixes:
             prefix = " ".join(prefixes) + " "
         else:
             prefix = ""
+        if suffixes:
+            suffix = " " + " ".join(suffixes)
+        else:
+            suffix = ""
+
         phrase = in_reply_to.filtered_text if in_reply_to else ""
-        reply = self.megahal.get_reply(phrase, max_length=CHARACTER_LIMIT - len(prefix))
+        reply = self.megahal.get_reply(phrase, max_length=CHARACTER_LIMIT - len(prefix) - len(suffix))
         while (not reply or self.db.posted_tweets.fuzzy_duplicates(reply.text)) and not killer.kill_now:
             # If, for some reason, we got an empty or duplicate reply: keep
             # trying, but don't learn from the input again
@@ -317,11 +332,15 @@ class TwitterHAL:
                 logger.info(f"Got duplicate reply, trying again (since {start_time}): {reply}")
             reply = self.megahal.get_reply_nolearn(phrase, max_length=CHARACTER_LIMIT - len(prefix))
         tweet = Tweet(
-            text=prefix + reply.text,
+            text=prefix + reply.text + suffix,
             in_reply_to_status_id=in_reply_to.id if in_reply_to is not None else None
         )
         logger.debug(f"Generated: {tweet}")
         return tweet
+
+    def process_new_mention(self, mention):
+        """Hook for doing what you need to do when a new mention comes in"""
+        return mention
 
     """ ---------- HELPFUL (?) UTILITY METHODS ---------- """
 
