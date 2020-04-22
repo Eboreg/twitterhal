@@ -70,6 +70,7 @@ RANDOM_POST_TIMES = [datetime.time(8), datetime.time(16), datetime.time(22)]
 INCLUDE_MENTIONS = True
 DETECTLANGUAGE_API_KEY = ""
 DATABASE_CLASS = "twitterhal.models.Database"
+BANNED_USERS = ["my_other_twitterhal_bot"]
 
 TWITTER_API = {
     "consumer_key": "foo",
@@ -96,6 +97,8 @@ MEGAHAL_API = {
 `RANDOM_POST_TIMES`: TwitterHAL will post a randomly generated tweet on those points of (local) time every day. Default: 8:00, 16:00, and 22:00 (that is 8 AM, 4 PM and 10 PM, for those of you stuck in antiquity).
 
 `INCLUDE_MENTIONS`: if `True`, TwitterHAL will include _all_ mentions in its replies. That is, not only the @handle of the user who wrote to it, but also every user they mentioned in their tweet. Perhaps you should use this carefully. Anyway, the default is `False`.
+
+`BANNED_USERS`: We will never respond to, or mention, these users. Useful if you, for example, run two bots and don't want them to get stuck in an eternal loop responding to each other. (Perhaps, someday, I will figure out a clever way to detect such loops automatically.) *NB: Don't include the "@"!*
 
 `MEGAHAL_API["banwords"]`: you may want to set this if your bot will not be speaking English. Pro tip: search for a list of the ~300 most commonly used words in your language, and use those.
 

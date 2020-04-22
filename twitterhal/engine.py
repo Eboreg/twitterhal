@@ -208,7 +208,11 @@ class TwitterHAL:
         if not self.force and not self.can_do_request("/statuses/mentions_timeline"):
             return TweetList()
         try:
-            mentions = [Tweet.from_status(m) for m in self.api.GetMentions() if m not in self.db.mentions]
+            mentions = [
+                Tweet.from_status(m) for m in self.api.GetMentions()
+                if m not in self.db.mentions and
+                m.user.screen_name.lower() not in [u.lower() for u in settings.BANNED_USERS]
+            ]
         except twitter.TwitterError as e:
             logger.error(str(e))
             return TweetList()
@@ -308,8 +312,12 @@ class TwitterHAL:
             if self.include_mentions:
                 mentions += [
                     # Negative lookbehind to avoid matching email addresses
-                    h for h in re.findall(r"(?<!\w)@[a-z0-9_]+", in_reply_to.text, flags=re.IGNORECASE)
-                    if h.lower() not in ["@" + self.screen_name, "@" + in_reply_to.user.screen_name.lower()]
+                    handle for handle in re.findall(r"(?<!\w)@[a-z0-9_]+", in_reply_to.text, flags=re.IGNORECASE)
+                    if handle.lower() not in [
+                        "@" + self.screen_name,
+                        "@" + in_reply_to.user.screen_name.lower(),
+                        *["@" + user.lower() for user in settings.BANNED_USERS]
+                    ]
                 ]
             prefix = " ".join(mentions + prefixes) + " "
         elif prefixes:

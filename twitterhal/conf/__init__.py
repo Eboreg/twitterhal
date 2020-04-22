@@ -13,19 +13,25 @@ def setting_str(key=None, value="", indent=0):
     if key:
         ret += "%s=" % key
     if isinstance(value, dict):
-        ret += "{\n"
-        ret += ",\n".join([setting_str(key=k, value=v, indent=indent + 4) for k, v in value.items()])
-        ret += "\n" + " " * indent + "}"
+        if len(value) == 0:
+            ret += "{}"
+        else:
+            ret += "{\n"
+            ret += ",\n".join([setting_str(key=k, value=v, indent=indent + 4) for k, v in value.items()])
+            ret += "\n" + " " * indent + "}"
     elif isinstance(value, list):
-        ret += "[\n"
-        too_long = False
-        if len(value) > 10:
-            value = value[:10]
-            too_long = True
-        ret += ",\n".join([setting_str(value=v, indent=indent + 4) for v in value])
-        if too_long:
-            ret += "\n" + " " * (indent + 4) + "... (Too many values to show)"
-        ret += "\n" + " " * indent + "]"
+        if len(value) == 0:
+            ret += "[]"
+        else:
+            ret += "[\n"
+            too_long = False
+            if len(value) > 10:
+                value = value[:10]
+                too_long = True
+            ret += ",\n".join([setting_str(value=v, indent=indent + 4) for v in value])
+            if too_long:
+                ret += "\n" + " " * (indent + 4) + "... (Too many values to show)"
+            ret += "\n" + " " * indent + "]"
     elif isinstance(value, str):
         ret += '"%s"' % value
     else:

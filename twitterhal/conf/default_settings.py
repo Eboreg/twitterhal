@@ -14,6 +14,10 @@ RUNNER_SLEEP_SECONDS = 5  # TODO: Document
 POST_STATUS_LIMIT = 300  # TODO: Document
 POST_STATUS_LIMIT_RESET_FREQUENCY = 3 * 60 * 60  # TODO: Document
 
+# List of Twitter handles we will never mention (including replying to them).
+# Without "@"!
+BANNED_USERS = []
+
 TWITTER_API = {
     "consumer_key": "",
     "consumer_secret": "",
