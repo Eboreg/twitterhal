@@ -33,17 +33,17 @@ class Database:
             db_path (str, optional): Path to the .db file on disk, without
                 extension. Default: "twitterhal"
         """
-        self.__is_open = False
-        self.__db_path = db_path
-        self.__lock = RLock()
-        self.__schema = {
+        self._is_open = False
+        self._db_path = db_path
+        self._lock = RLock()
+        self._schema = {
             "posted_tweets": DatabaseItem("posted_tweets", TweetList, TweetList(unique=True)),
             "mentions": DatabaseItem("mentions", TweetList, TweetList(unique=True)),
         }
 
     def add_key(self, name, type_, default):
-        assert not self.__is_open, "Cannot add to schema once DB has been opened"
-        self.__schema[name] = DatabaseItem(name, type_, default)
+        assert not self._is_open, "Cannot add to schema once DB has been opened"
+        self._schema[name] = DatabaseItem(name, type_, default)
 
     def __enter__(self):
         self.open()
@@ -53,31 +53,31 @@ class Database:
         self.close()
 
     def __setattr__(self, name, value):
-        if not name.startswith("_") and self.__is_open:
-            with self.__lock:
-                assert name in self.__schema, "Key %s not present in DB schema" % name
-                self.__schema[name].value = value
-                self.__db[name] = value
+        if not name.startswith("_") and self._is_open:
+            with self._lock:
+                assert name in self._schema, "Key %s not present in DB schema" % name
+                self._schema[name].value = value
+                self._db[name] = value
         super().__setattr__(name, value)
 
     def open(self):
-        with self.__lock:
-            self.__db = shelve.open(self.__db_path)
-            for k, v in self.__schema.items():
-                setattr(self, k, self.__db.get(k, v.value))
-            self.__is_open = True
+        with self._lock:
+            self._db = shelve.open(self._db_path)
+            for k, v in self._schema.items():
+                setattr(self, k, self._db.get(k, v.value))
+            self._is_open = True
 
     def close(self):
-        with self.__lock:
+        with self._lock:
             self.sync()
-            self.__db.close()
-            self.__is_open = False
+            self._db.close()
+            self._is_open = False
 
     def sync(self):
-        with self.__lock:
-            for key in self.__schema.keys():
-                self.__db[key] = getattr(self, key)
-            self.__db.sync()
+        with self._lock:
+            for key in self._schema.keys():
+                self._db[key] = getattr(self, key)
+            self._db.sync()
 
 
 class Tweet(Status):

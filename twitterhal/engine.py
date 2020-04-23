@@ -219,7 +219,7 @@ class TwitterHAL:
         else:
             self.db.mentions.extend(mentions)
             for mention in mentions:
-                logger.info(f"Got new mention: {mention.text}")
+                logger.info(f"Got new mention: {mention}")
                 mention = self.process_new_mention(mention)
                 self.mention_queue.put(mention)
 
@@ -243,7 +243,7 @@ class TwitterHAL:
             except queue.Empty:
                 pass
             else:
-                logger.debug(f"Generating reply to {mention.text}")
+                logger.debug(f"Generating reply to {mention}")
                 reply = self.generate_tweet(in_reply_to=mention)
                 logger.debug(f"Putting reply in post_queue: {reply}")
                 self.post_queue.put(reply)
@@ -431,7 +431,7 @@ class TwitterHAL:
             logger.error(str(e))
         else:
             # Logging the request here, since I guess it counts towards
-            # the rate limit whether we succeed or not
+            # the rate limit regardless of whether we succeed or not
             self._set_post_status_limit(subtract=1)
             self.db.posted_tweets.append(Tweet.from_status(status))
             if tweet.in_reply_to_status_id:
@@ -443,8 +443,7 @@ class TwitterHAL:
             else:
                 logger.info(f"Posted: {tweet}")
         if not tweet.in_reply_to_status_id and self.generate_random_lock.locked():
-            # This was a random tweet, so release lock (whether post
-            # succeeded or not)
+            # This was a random tweet, so release lock (regardless of success)
             logger.debug("Releasing generate_random_lock")
             self.generate_random_lock.release()
 
