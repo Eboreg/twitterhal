@@ -352,6 +352,16 @@ class TwitterHAL:
 
     """ ---------- HELPFUL (?) UTILITY METHODS ---------- """
 
+    def mark_mentions_answered(self):
+        """Fetch all recent mentions and mark them as answered"""
+        self.get_new_mentions()
+        count = 0
+        while not self.mention_queue.empty():
+            mention: "Tweet" = self.mention_queue.get()
+            mention.is_answered = True
+            count += 1
+        logger.info(f"Fetched {count} mentions and marked them as answered")
+
     def post_from_queue(self):
         """Post all queued Tweets
 

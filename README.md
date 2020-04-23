@@ -24,7 +24,7 @@ But all those should be installed automatically by `pip` or `setup.py`. (`detect
 ```
 $ twitterhal
 usage: twitterhal [-s SETTINGS_MODULE] [-d] [-m] [-f] [-t]
-                  [-r | --chat | --stats | --print-config | --post-random]
+                  [-r | --chat | --stats | --print-config | --post-random | --mark-mentions-answered]
 
 optional arguments:
   -s SETTINGS_MODULE, --settings SETTINGS_MODULE
@@ -43,6 +43,9 @@ optional arguments:
   --stats               Display some stats
   --print-config        Print current parsed config
   --post-random         Post a new random tweet
+  --mark-mentions-answered
+                        Fetch the latest mentions and mark them all as
+                        answered. Useful if you had to re-init the DB.
 ```
 
 `twitterhal --run` will post random tweets at `random_post_times` (see below), as well as answering all incoming mentions, all while trying its best not to exceed the [Twitter API rate limits](https://developer.twitter.com/en/docs/basics/rate-limits).

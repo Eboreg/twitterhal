@@ -44,6 +44,10 @@ class CommandLine:
         self.mutex.add_argument("--stats", action="store_true", help="Display some stats")
         self.mutex.add_argument("--print-config", action="store_true", help="Print current parsed config")
         self.mutex.add_argument("--post-random", action="store_true", help="Post a new random tweet")
+        self.mutex.add_argument(
+            "--mark-mentions-answered", action="store_true",
+            help="Fetch the latest mentions and mark them all as answered. Useful if you had to re-init the DB."
+        )
 
     def __enter__(self):
         self.setup()
@@ -79,6 +83,9 @@ class CommandLine:
         elif self.args.post_random:
             with self.TwitterHAL(**self.get_hal_kwargs()) as hal:
                 hal.post_random_tweet()
+        elif self.args.mark_mentions_answered:
+            with self.TwitterHAL(**self.get_hal_kwargs()) as hal:
+                hal.mark_mentions_answered()
         elif self.args.run:
             with self.TwitterHAL(**self.get_hal_kwargs()) as hal:
                 runner.sleep_seconds = settings.RUNNER_SLEEP_SECONDS
