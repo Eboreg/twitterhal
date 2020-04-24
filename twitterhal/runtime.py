@@ -76,7 +76,7 @@ class LoopTask(Task):
 class Runner:
     """
     TODO:
-    Gör task- och worker-listor "interna" genom att döpa till __ ...
+    Gör task- och worker-listor "interna" genom att döpa till _*
     """
 
     def __init__(self, sleep_seconds):

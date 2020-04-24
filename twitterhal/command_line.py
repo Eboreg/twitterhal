@@ -1,6 +1,7 @@
 import argparse
 import logging
 
+from twitterhal import __version__
 from twitterhal.conf import settings
 from twitterhal.engine import TwitterHAL
 from twitterhal.runtime import runner
@@ -20,7 +21,7 @@ class CommandLine:
         if settings_module:
             settings.setup(settings_module=settings_module)
 
-        self.parser = argparse.ArgumentParser(add_help=False)
+        self.parser = argparse.ArgumentParser(add_help=False, prog="twitterhal")
         self.parser.add_argument(
             "-s", "--settings", dest="settings_module",
             help="Python path to settings module. If omitted, we try looking for it in the "
@@ -47,6 +48,10 @@ class CommandLine:
         self.mutex.add_argument(
             "--mark-mentions-answered", action="store_true",
             help="Fetch the latest mentions and mark them all as answered. Useful if you had to re-init the DB."
+        )
+        self.mutex.add_argument(
+            "--version", action="version", version="%(prog)s " + __version__,
+            help="Show program's version number and exit"
         )
 
     def __enter__(self):
