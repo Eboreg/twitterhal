@@ -2,7 +2,7 @@
 
 A MegaHAL Twitter bot in Python.
 
-**This project is in alpha, and NOT considered stable in any way.**
+**This project is in alpha, and should NOT be considered stable in any way.**
 
 Live examples (in Swedish): [@bibel3000](https://twitter.com/bibel3000), [@trendhal3000](https://twitter.com/trendhal3000)
 
@@ -101,11 +101,13 @@ MEGAHAL_API = {
 
 `INCLUDE_MENTIONS`: if `True`, TwitterHAL will include _all_ mentions in its replies. That is, not only the @handle of the user who wrote to it, but also every user they mentioned in their tweet. Perhaps you should use this carefully. Anyway, the default is `False`.
 
-`BANNED_USERS`: We will never respond to, or mention, these users. Useful if you, for example, run two bots and don't want them to get stuck in an eternal loop responding to each other. (Perhaps, someday, I will figure out a clever way to detect such loops automatically.) *NB: Don't include the "@"!*
+`BANNED_USERS`: List of Twitter usernames (handles), without leading "@". We will never respond to, or mention, these users. Useful if you, for example, run two bots and don't want them to get stuck in an eternal loop responding to each other. (Perhaps, someday, I will figure out a clever way to detect such loops automatically.)
 
 `MEGAHAL_API["banwords"]`: you may want to set this if your bot will not be speaking English. Pro tip: search for a list of the ~300 most commonly used words in your language, and use those.
 
 ## Extending
+
+### Persistent storage
 
 You may extend TwitterHAL's database by subclassing `TwitterHAL` and adding `models.DatabaseItem` definitions to its `init_db()` method. Maybe you want to feed the MegaHAL brain by regularily fetching top tweets for trending topics, and need to keep track of those? I know I do.
 
@@ -113,6 +115,47 @@ By default, the database (which is of type `models.Database`) will contain:
 * `posted_tweets` (`models.TweetList`): List of posted Tweets
 * `mentions` (`models.TweetList`): List of tweets that mention us, and whether they have been answered
 
-Tweets are internally stored in `models.TweetList`, which contains the method `only_in_language()`. This will filter out all tweets that are _probably_ in the chosen language, with the help of the [Language Detection API](https://detectlanguage.com/). Just install the PyPI package `detectlanguage`, get yourself an API key and feed it to `detectlanguage.configuration.api_key` (or set it in your settings; see above), and you're all set.
+### Language detection
+
+Tweets are internally stored in `models.TweetList`, which contains the method `only_in_language()`. This will filter out all tweets that are _probably_ in the chosen language, with the help of the [Language Detection API](https://detectlanguage.com/). Just `pip install detectlanguage`, get yourself an API key and feed it to `detectlanguage.configuration.api_key` (or set it in your settings; see above), and you're all set.
+
+### Twitter API calls
 
 If you extend TwitterHAL with new methods that call the Twitter API, it's recommended you also check TwitterHAL's `can_do_request(url)`, where `url` is something like `/statuses/mentions_timeline` (consult [this page](https://developer.twitter.com/en/docs/basics/rate-limits) for full list), to see whether this call should be made at this time.
+
+### Runtime
+
+The "daemon" (not really a daemon) `twitterhal.runtime.runner`, invoked by `twitterhal --run`, does these things:
+
+1. Starts _workers_, which will run continuously in separate threads
+2. With an interval of `settings.RUNNER_SLEEP_SECONDS` seconds (default: 5), runs _loop tasks_, each in a new thread
+3. On exit, runs _post loop tasks_
+
+_Workers_ are registered by `TwitterHAL.register_workers()` through `runner.register_worker()`, and should be callables that loop until interrupted by a signal (see _GracefulKiller_ section below). If they accept the boolean keyword argument `restart`, they will be executed with `restart=True` in case they exited prematurely and had to be restarted by the runner.
+
+_Loop tasks_, unlike workers, should be finite in time. They are registered by `TwitterHAL.register_loop_tasks()` through `runner.register_loop_task()`, are run max once per loop, and can be any callable. If `runner.register_loop_task()` is called with the integer argument `sleep` (seconds), `GracefulKiller.sleep()` (see below) will be called at the end of every execution of this task, and the runner will be prohibited from starting new executions of the task until this one has finished. (If you don't want it to sleep at the end, but still want to block the task from being run multiple times concurrently, send `sleep=0`.)
+
+_Post loop tasks_ are registrered by `TwitterHAL.register_post_loop_tasks()` through `runner.register_post_loop_task()`, and can be any callable. They are called after the loop has been interrupted, and are _not_ run in separate threads. Useful for various clean-up actions. By default, there are none.
+
+### GracefulKiller
+
+`gracefulkiller.killer` is an object that listens for `SIGINT` and `SIGTERM` signals, whereupon its `kill_now` attribute is set to `True`. It also has a `sleep()` method, that mimics `time.sleep()` but aborts max 1 second after one of the aforementioned signals has been caught. `sleep()` returns `True` if `SIGALRM` was caught sometime during the sleeping, which could be used for pinging. Feel free to use this in your _workers_, _loop tasks_, etc.
+
+Example:
+
+```python
+from twitterhal.gracefulkiller import killer
+
+def hello_world_worker():
+    while not killer.kill_now:
+        print("Hello, world!")
+        ping = killer.sleep(10)
+        if ping:
+            print("Pong!")
+```
+
+## Q & A
+
+> Why doesn't TwitterHAL see all my mentions?
+
+Twitter has a setting called "quality filter", which is said to "filter lower-quality content from your notifications", and is turned on by default. You can go to your bot's [notifications settings](https://twitter.com/settings/notifications) and uncheck the "Quailty filter" checkbox (at least, that's how you did it 2020-04-24). This should solve it.
