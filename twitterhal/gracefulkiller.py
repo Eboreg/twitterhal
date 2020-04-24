@@ -26,13 +26,14 @@ class GracefulKiller:
         # A "friendlier" sleep method, that always takes <= 1 sec to wake up
         # after a signal has been received.
         # Returns True if we caught SIGALRM, False otherwise
+        alarm = False
         for _ in range(seconds):
             if self.alarm:
                 self.alarm = False
-                return True
-            elif not self.kill_now:
+                alarm = True
+            if not self.kill_now:
                 time.sleep(1)
-        return False
+        return alarm
 
 
 killer = GracefulKiller()
