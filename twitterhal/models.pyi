@@ -2,28 +2,34 @@ from collections import UserList
 from datetime import datetime
 from shelve import DbfilenameShelf
 from threading import RLock
-from typing import Any, Dict, Iterable, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, Generic, Iterable, List, Optional, Type, TypeVar, Union
 
 from twitter.models import Status
 
 
-T = TypeVar("T")
+DBI = TypeVar("DBI")
 
 
-class DatabaseItem:
-    def __init__(self, name: str, type_: Type[T], default_value: T): ...
-    def __setattr__(self, name: str, value: T): ...
+class DatabaseItem(Generic[DBI]):
+    default_args: List
+    default_kwargs: Dict
+    is_list: bool
+    type: Type[DBI]
+    value: DBI
+
+    def __init__(self, type_: Type[DBI], *default_args, is_list: bool, **default_kwargs): ...
+    def __setattr__(self, name: str, value: DBI): ...
 
 
 class Database:
-    __db_name: str
-    __db: DbfilenameShelf
-    __is_open: bool
-    __lock: RLock
-    __schema: Dict[str, DatabaseItem]
+    _db_name: str
+    _db: DbfilenameShelf
+    _is_open: bool
+    _lock: RLock
+    _schema: Dict[str, DatabaseItem]
 
     def __init__(self, db_name: str): ...
-    def add_key(self, name: str, type_: Type[T], default: T): ...
+    def add_key(self, name: str, type_: Type[DBI], default: DBI): ...
     def close(self): ...
     def open(self): ...
     def sync(self): ...
@@ -44,6 +50,9 @@ class Tweet(Status):
     def __setattr__(self, name: str, value: Any): ...
     @classmethod
     def from_status(cls, status: Status) -> "Tweet": ...
+
+
+class RedisListWrapper(UserList): ...
 
 
 class TweetList(UserList, Iterable[Tweet]):

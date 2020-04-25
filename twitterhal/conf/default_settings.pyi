@@ -14,3 +14,4 @@ RANDOM_POST_TIMES: List[datetime.time]
 RUNNER_SLEEP_SECONDS: int
 SCREEN_NAME: str
 TWITTER_API: Dict[str, Any]
+USE_REDIS: bool

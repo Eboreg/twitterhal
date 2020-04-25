@@ -14,6 +14,12 @@ RUNNER_SLEEP_SECONDS = 5  # TODO: Document
 POST_STATUS_LIMIT = 300  # TODO: Document
 POST_STATUS_LIMIT_RESET_FREQUENCY = 3 * 60 * 60  # TODO: Document
 
+try:
+    from redis import VERSION
+    USE_REDIS = VERSION[0] >= 3
+except ImportError:
+    USE_REDIS = False
+
 # List of Twitter handles we will never mention (including replying to them).
 # Without "@"!
 BANNED_USERS = []
@@ -33,4 +39,10 @@ MEGAHAL_API = {
     "order": megahal.DEFAULT_ORDER,
     "timeout": megahal.DEFAULT_HARD_TIMEOUT,
     "banwords": megahal.DEFAULT_BANWORDS,
+}
+
+REDIS_API = {
+    "host": "localhost",
+    "port": 6379,
+    "db": 0,
 }
