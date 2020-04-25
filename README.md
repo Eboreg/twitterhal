@@ -158,4 +158,4 @@ def hello_world_worker():
 
 > Why doesn't TwitterHAL see all my mentions?
 
-Twitter has a setting called "quality filter", which is said to "filter lower-quality content from your notifications", and is turned on by default. You can go to your bot's [notifications settings](https://twitter.com/settings/notifications) and uncheck the "Quailty filter" checkbox (at least, that's how you did it 2020-04-24). This should solve it.
+Twitter has a setting called "quality filter", which is said to "filter lower-quality content from your notifications", and is turned on by default. You can go to your bot's [notifications settings](https://twitter.com/settings/notifications) and uncheck the "Quality filter" checkbox (at least, that's how you did it 2020-04-24). This should solve it.
