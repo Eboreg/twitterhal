@@ -4,6 +4,7 @@ from shelve import DbfilenameShelf
 from threading import RLock
 from typing import Any, Dict, Generic, Iterable, List, Optional, Type, TypeVar, Union
 
+from redis import Redis
 from twitter.models import Status
 
 
@@ -11,28 +12,49 @@ DBI = TypeVar("DBI")
 
 
 class DatabaseItem(Generic[DBI]):
-    default_args: List
-    default_kwargs: Dict
-    is_list: bool
     type: Type[DBI]
-    value: DBI
+    defaults: Dict[str, Any]
 
-    def __init__(self, type_: Type[DBI], *default_args, is_list: bool, **default_kwargs): ...
-    def __setattr__(self, name: str, value: DBI): ...
+    def __init__(self, type_: Type[DBI], **defaults): ...
 
 
-class Database:
-    _db_name: str
-    _db: DbfilenameShelf
+class BaseDatabase:
     _is_open: bool
-    _lock: RLock
     _schema: Dict[str, DatabaseItem]
 
-    def __init__(self, db_name: str): ...
-    def add_key(self, name: str, type_: Type[DBI], default: DBI): ...
+    def __enter__(self) -> BaseDatabase: ...
+    def __exit__(self, *args, **kwargs): ...
+    def __init__(self): ...
+    def __setattr__(self, name: str, value: Any): ...
+    def add_key(self, name: str, type_: Type[DBI], **defaults): ...
     def close(self): ...
+    def migrate_to(self, other_db: BaseDatabase): ...
     def open(self): ...
+    def setattr(self, name: str, value: Any): ...
     def sync(self): ...
+
+
+class ShelveDatabase(BaseDatabase):
+    _db_path: str
+    _db: DbfilenameShelf
+    _lock: RLock
+
+    def __init__(self, db_path: str): ...
+
+
+class RedisDatabase(BaseDatabase):
+    _redis: Redis
+    _redis_kwargs: Dict[str, Any]
+
+    def __init__(self, **kwargs): ...
+
+
+class RedisList(UserList):
+    def __init__(self, redis: Redis, key: str, initlist: Union[List, UserList, None]): ...
+    def push_to_cache(self): ...
+    def pull_from_cache(self): ...
+    @classmethod
+    def wrap(cls, userlist: UserList, redis: Redis, key: str, overwrite: bool) -> UserList: ...
 
 
 class Tweet(Status):
@@ -50,9 +72,6 @@ class Tweet(Status):
     def __setattr__(self, name: str, value: Any): ...
     @classmethod
     def from_status(cls, status: Status) -> "Tweet": ...
-
-
-class RedisListWrapper(UserList): ...
 
 
 class TweetList(UserList, Iterable[Tweet]):

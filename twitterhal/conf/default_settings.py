@@ -1,24 +1,39 @@
 import datetime
+import pickle
 
 import megahal
 import twitter
 
+DATABASE_REDIS = {
+    "class": "twitterhal.models.RedisDatabase",
+    "options": {
+        "host": "localhost",
+        "port": 6379,
+        "db": 0,
+    },
+    "test_options": {
+        "db": 15,
+    },
+}
+DATABASE_SHELVE = {
+    "class": "twitterhal.models.ShelveDatabase",
+    "options": {
+        "db_path": "twitterhal",
+    },
+    "test_options": {
+        "db_path": "test",
+    },
+}
 
-SCREEN_NAME = ""
-RANDOM_POST_TIMES = [datetime.time(8), datetime.time(16), datetime.time(22)]
-INCLUDE_MENTIONS = False
-DATABASE_CLASS = "twitterhal.models.Database"
-DATABASE_FILE = "twitterhal"
+DATABASE = DATABASE_SHELVE
 DETECTLANGUAGE_API_KEY = ""
-RUNNER_SLEEP_SECONDS = 5  # TODO: Document
-POST_STATUS_LIMIT = 300  # TODO: Document
-POST_STATUS_LIMIT_RESET_FREQUENCY = 3 * 60 * 60  # TODO: Document
-
-try:
-    from redis import VERSION
-    USE_REDIS = VERSION[0] >= 3
-except ImportError:
-    USE_REDIS = False
+INCLUDE_MENTIONS = False
+PICKLE_PROTOCOL = pickle.DEFAULT_PROTOCOL
+POST_STATUS_LIMIT = 300
+POST_STATUS_LIMIT_RESET_FREQUENCY = 3 * 60 * 60
+RANDOM_POST_TIMES = [datetime.time(8), datetime.time(16), datetime.time(22)]
+RUNNER_SLEEP_SECONDS = 5
+SCREEN_NAME = ""
 
 # List of Twitter handles we will never mention (including replying to them).
 # Without "@"!
@@ -39,10 +54,4 @@ MEGAHAL_API = {
     "order": megahal.DEFAULT_ORDER,
     "timeout": megahal.DEFAULT_HARD_TIMEOUT,
     "banwords": megahal.DEFAULT_BANWORDS,
-}
-
-REDIS_API = {
-    "host": "localhost",
-    "port": 6379,
-    "db": 0,
 }

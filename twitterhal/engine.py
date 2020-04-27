@@ -49,14 +49,16 @@ class TwitterHAL:
                 Default: False
         """
         # Take care of settings
-        db_path = "test" if test else settings.DATABASE_FILE
         Database = settings.get_database_class()
+        db_options = settings.DATABASE.get("options", {})
+        if test:
+            db_options.update(settings.DATABASE.get("test_options", {}))
         self.include_mentions = include_mentions or settings.INCLUDE_MENTIONS
         self.random_post_times = random_post_times or settings.RANDOM_POST_TIMES
         self.screen_name = screen_name or settings.SCREEN_NAME
 
         # Set up runtime stuff
-        self.db = cast("DBInstance", Database(db_path=db_path))
+        self.db = cast("DBInstance", Database(**db_options))
         self.force = force
         self.generate_random_lock = threading.Lock()
         self.megahal_open = False
@@ -143,7 +145,7 @@ class TwitterHAL:
         except twitter.TwitterError:
             warnings.warn("Could not connect to Twitter API! Keys/secrets incorrect?")
             random_tweets = []
-        if len(random_tweets) > 0 and random_tweets[0] not in self.db.posted_tweets:
+        if len(random_tweets) > 0:
             self.db.posted_tweets.append(Tweet.from_status(random_tweets[0]))
         logger.debug("DB initialized")
 
@@ -433,7 +435,8 @@ class TwitterHAL:
             # Logging the request here, since I guess it counts towards
             # the rate limit regardless of whether we succeed or not
             self._set_post_status_limit(subtract=1)
-            self.db.posted_tweets.append(Tweet.from_status(status))
+            tweet = Tweet.from_status(status)
+            self.db.posted_tweets.append(tweet)
             if tweet.in_reply_to_status_id:
                 # This was a reply to a mention
                 original_tweet = self.db.mentions.get_by_id(tweet.in_reply_to_status_id)

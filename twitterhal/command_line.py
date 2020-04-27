@@ -6,12 +6,10 @@ from twitterhal.conf import settings
 from twitterhal.engine import TwitterHAL
 from twitterhal.runtime import runner
 
-
-def init_logging(loglevel=logging.ERROR):
-    logging.basicConfig(
-        format="%(asctime)s: [%(funcName)s: %(lineno)d] %(message)s", level=loglevel, datefmt="%H:%M:%S"
-    )
-    return logging.getLogger(__package__)
+logging.basicConfig(
+    format="%(asctime)s: [%(funcName)s: %(lineno)d] %(message)s", level=logging.ERROR, datefmt="%H:%M:%S"
+)
+logger = logging.getLogger(__name__)
 
 
 class CommandLine:
@@ -65,12 +63,10 @@ class CommandLine:
         self.args = self.parser.parse_args()
         settings.setup(settings_module=self.args.settings_module)
         if self.args.debug:
-            logger = init_logging(logging.DEBUG)
+            logger.setLevel(logging.DEBUG)
             logger.debug("TESTING DEBUG LOGGING")
         elif self.args.run:
-            logger = init_logging(logging.INFO)
-        else:
-            logger = init_logging()
+            logger.setLevel(logging.INFO)
         self.init_megahal = self.args.run or self.args.chat or self.args.post_random
 
     def get_hal_kwargs(self):

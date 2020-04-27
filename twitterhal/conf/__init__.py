@@ -116,7 +116,7 @@ class Settings:
         return getattr(self, key, default)
 
     def get_database_class(self):
-        mod, klass = self.DATABASE_CLASS.rsplit(".", maxsplit=1)
+        mod, klass = self.DATABASE["class"].rsplit(".", maxsplit=1)
         return getattr(importlib.import_module(mod), klass)
 
 

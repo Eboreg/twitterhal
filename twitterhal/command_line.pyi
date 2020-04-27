@@ -1,24 +1,26 @@
 from argparse import ArgumentParser, Namespace, _MutuallyExclusiveGroup
 from types import ModuleType
-from typing import Type, Union
+from typing import Any, Dict, Generic, Type, TypeVar, Union
 
 import twitterhal
 
+TH = TypeVar("TH", bound=twitterhal.TwitterHAL)
 
-def init_logging(loglevel: int): ...
+
 def main(): ...
 
-class CommandLine:
+class CommandLine(Generic[TH]):
     args: Namespace
+    hal: TH
     init_megahal: bool
-    parser: ArgumentParser
     mutex: _MutuallyExclusiveGroup
-    TwitterHAL: Type[twitterhal.TwitterHAL]
-    hal: twitterhal.TwitterHAL
+    parser: ArgumentParser
+    TwitterHAL: Type[TH]
 
     def __enter__(self): ...
     def __exit__(self, *args, **kwargs): ...
-    def __init__(self, twitterhal_class: Type[twitterhal.TwitterHAL], settings_module=Union[str, ModuleType, None]): ...
+    def __init__(self, twitterhal_class: Type[TH], settings_module=Union[str, ModuleType, None]): ...
+    def get_hal_kwargs(self) -> Dict[str, Any]: ...
     def print_stats(self, *args, **kwargs): ...
     def run_extra(self, *args, **kwargs) -> bool: ...
     def run(self, *args, **kwargs): ...

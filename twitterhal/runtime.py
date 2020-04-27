@@ -126,7 +126,7 @@ class Runner:
             logger.info(f"Starting post loop task: {task.name} ...")
             task()
 
-    def run(self):
+    def run(self, test=False):
         with ThreadPoolExecutor() as self.executor:
             self.start_workers()
             while not killer.kill_now:

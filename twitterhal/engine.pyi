@@ -7,10 +7,10 @@ import twitter
 from megahal import MegaHAL
 from twitter.ratelimit import EndpointRateLimit
 
-from twitterhal.models import Database, Tweet, TweetList
+from twitterhal.models import BaseDatabase, Tweet, TweetList
 
 
-class DBInstance(Database):
+class DBInstance(BaseDatabase):
     posted_tweets: TweetList
     mentions: TweetList
 

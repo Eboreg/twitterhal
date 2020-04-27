@@ -72,8 +72,15 @@ SCREEN_NAME = "my_k3wl_twitter_user"
 RANDOM_POST_TIMES = [datetime.time(8), datetime.time(16), datetime.time(22)]
 INCLUDE_MENTIONS = True
 DETECTLANGUAGE_API_KEY = ""
-DATABASE_CLASS = "twitterhal.models.Database"
+DATABASE = {
+    "class": "path.to.DatabaseClass",
+    "options": {},
+    "test_options": {},
+}
 BANNED_USERS = ["my_other_twitterhal_bot"]
+RUNNER_SLEEP_SECONDS = 5
+POST_STATUS_LIMIT = 300
+POST_STATUS_LIMIT_RESET_FREQUENCY = 3 * 60 * 60
 
 TWITTER_API = {
     "consumer_key": "foo",
@@ -93,17 +100,23 @@ MEGAHAL_API = {
 }
 ```
 
-`TWITTER_API` contains keyword arguments for `twitter.Api`. Read more about it [here](https://python-twitter.readthedocs.io/en/latest/twitter.html).
+`BANNED_USERS`: List of Twitter usernames (handles), without leading "@". We will never respond to, or mention, these users. Useful if you, for example, run two bots and don't want them to get stuck in an eternal loop responding to each other. (Perhaps, someday, I will figure out a clever way to detect such loops automatically.)
 
-`MEGAHAL` contains keyword arguments for `megahal.Megahal`. Consult [that module](https://pypi.org/project/megahal/) for more info.
-
-`RANDOM_POST_TIMES`: TwitterHAL will post a randomly generated tweet on those points of (local) time every day. Default: 8:00, 16:00, and 22:00 (that is 8 AM, 4 PM and 10 PM, for those of you stuck in antiquity).
+`DATABASE`: A dict of info about the database backend. Must at least contain the key `class`, which must be the path of a class inheriting from `models.BaseDatabase`. Included are `models.ShelveDatabase` and `models.RedisDatabase`. The `options` key contains kwargs to be sent to that database class' `__init__()` method. When TwitterHAL is run with the `--test` option, the options will be extended with the contents of the `test_options` dict.
 
 `INCLUDE_MENTIONS`: if `True`, TwitterHAL will include _all_ mentions in its replies. That is, not only the @handle of the user who wrote to it, but also every user they mentioned in their tweet. Perhaps you should use this carefully. Anyway, the default is `False`.
 
-`BANNED_USERS`: List of Twitter usernames (handles), without leading "@". We will never respond to, or mention, these users. Useful if you, for example, run two bots and don't want them to get stuck in an eternal loop responding to each other. (Perhaps, someday, I will figure out a clever way to detect such loops automatically.)
+`MEGAHAL` contains keyword arguments for `megahal.Megahal`. Consult [that module](https://pypi.org/project/megahal/) for more info.
 
 `MEGAHAL_API["banwords"]`: you may want to set this if your bot will not be speaking English. Pro tip: search for a list of the ~300 most commonly used words in your language, and use those.
+
+`POST_STATUS_LIMIT` and `POST_STATUS_LIMIT_RESET_FREQUENCY`: For some reason, Twitter's API doesn't provide info about the current ratio limits for posting tweets (and retweets), so I had to implement that check myself to my best ability. The numbers are taken from [here](https://developer.twitter.com/en/docs/basics/rate-limits).
+
+`RANDOM_POST_TIMES`: TwitterHAL will post a randomly generated tweet on those points of (local) time every day. Default: 8:00, 16:00, and 22:00 (that is 8 AM, 4 PM and 10 PM, for those of you stuck in antiquity).
+
+`RUNNER_SLEEP_SECONDS`: The interval with which `runtime.runner` starts its _loop tasks_. See below.
+
+`TWITTER_API` contains keyword arguments for `twitter.Api`. Read more about it [here](https://python-twitter.readthedocs.io/en/latest/twitter.html).
 
 ## Extending
 
@@ -111,7 +124,7 @@ MEGAHAL_API = {
 
 You may extend TwitterHAL's database by subclassing `TwitterHAL` and adding `models.DatabaseItem` definitions to its `init_db()` method. Maybe you want to feed the MegaHAL brain by regularily fetching top tweets for trending topics, and need to keep track of those? I know I do.
 
-By default, the database (which is of type `models.Database`) will contain:
+By default, the database (which is a subtype of `models.BaseDatabase`) will contain:
 * `posted_tweets` (`models.TweetList`): List of posted Tweets
 * `mentions` (`models.TweetList`): List of tweets that mention us, and whether they have been answered
 

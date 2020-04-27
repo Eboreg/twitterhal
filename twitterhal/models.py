@@ -229,6 +229,8 @@ class RedisList(UserList):
                 self.data = initlist.data[:]
             else:
                 self.data = list(initlist)
+        else:
+            self.push_to_cache()
 
     @classmethod
     def wrap(cls, userlist, redis, key, overwrite=False):
@@ -249,48 +251,28 @@ class RedisList(UserList):
 
         Returns:
             The same UserList, but now "wrapped".
-
-        TODO: Implement an efficient __contains__ that does not fetch the
-        entire Redis list for each iteration :D
         """
         assert isinstance(userlist, UserList)
         userlist.data = cls(redis, key, initlist=userlist.data if overwrite else None)
         setattr(userlist, "_redis_wrapped", True)
         return userlist
 
-    @property
-    def cache(self):
-        if not hasattr(self, "_cache") or self._cache is None:
-            self._cache = self.data
-        return self._cache
+    def push_to_cache(self):
+        self.cache = [pickle.loads(i) for i in self.redis.lrange(self.key, 0, -1)]
+
+    def pull_from_cache(self):
+        self.data = self.cache
 
     @property
     def data(self):
-        return [pickle.loads(i) for i in self.redis.lrange(self.key, 0, -1)]
+        return self.cache
 
     @data.setter
     def data(self, value):
         self.clear()
-        self._cache = value
+        self.cache = value
         if value:
             self.redis.rpush(self.key, *[pickle.dumps(i, protocol=settings.PICKLE_PROTOCOL) for i in value])
-
-    def __len__(self):
-        return len(self.cache)
-
-    def __getitem__(self, i):
-        if isinstance(i, slice):
-            if i.step is not None:
-                raise NotImplementedError("Slice step not implemented yet")
-            start = i.start or 0
-            stop = (i.stop or 0) - 1
-            if stop == -1:
-                return []
-            return [pickle.loads(value) for value in self.redis.lrange(self.key, start, stop)]
-        value = self.redis.lindex(self.key, i)
-        if value is None:
-            raise IndexError("list index out of range")
-        return pickle.loads(value)
 
     def __setitem__(self, i, item):
         from redis import ResponseError
@@ -298,17 +280,19 @@ class RedisList(UserList):
             self.redis.lset(self.key, i, pickle.dumps(item, protocol=settings.PICKLE_PROTOCOL))
         except ResponseError:
             raise IndexError("list assignment index out of range")
+        else:
+            self.push_to_cache()
 
     def __delitem__(self, i):
-        # Not safe for lists with duplicate elements
-        value = self.redis.lindex(self.key, i)
-        if value is None:
+        try:
+            self.pop(i)
+        except IndexError:
             raise IndexError("list assignment index out of range")
-        self.redis.lrem(self.key, 1, value)
+        else:
+            self.push_to_cache()
 
     def __iter__(self):
-        for item in self.redis.lrange(self.key, 0, -1):
-            yield pickle.loads(item)
+        return self.cache.__iter__()
 
     def __iadd__(self, other):
         self.extend(other)
@@ -324,15 +308,18 @@ class RedisList(UserList):
         elif n > 1:
             items = self.redis.lrange(self.key, 0, -1)
             if items:
-                for _ in range(1, n):
-                    self.redis.rpush(self.key, *items)
+                with self.redis.pipeline() as pipe:
+                    for _ in range(1, n):
+                        pipe.rpush(self.key, *items)
+                    pipe.execute()
+                self.push_to_cache()
         return self
 
     def append(self, item):
         self.redis.rpush(self.key, pickle.dumps(item, protocol=settings.PICKLE_PROTOCOL))
+        self.cache.append(item)
 
     def insert(self, i, item):
-        # Not safe for lists with duplicate elements
         ref_item = self.redis.lindex(self.key, i)
         if ref_item is None:
             # Mimicking Python's list insert behaviour
@@ -342,6 +329,7 @@ class RedisList(UserList):
                 self.redis.lpush(self.key, pickle.dumps(item, protocol=settings.PICKLE_PROTOCOL))
         else:
             self.redis.linsert(self.key, "BEFORE", ref_item, pickle.dumps(item, protocol=settings.PICKLE_PROTOCOL))
+        self.cache.insert(i, item)
 
     def pop(self, i=-1):
         if self.redis.llen(self.key) == 0:
@@ -355,25 +343,27 @@ class RedisList(UserList):
             if value is None:
                 raise IndexError("pop index out of range")
             self.redis.lrem(self.key, 1, value)
+        self.cache.pop(i)
         return pickle.loads(value)
 
     def remove(self, item):
-        count = self.redis.lrem(self.key, 1, pickle.dumps(item, protocol=settings.PICKLE_PROTOCOL))
-        if not count:
+        try:
+            index = self.cache.index(item)
+        except ValueError:
             raise ValueError("list.remove(x): x not in list")
+        self.pop(index)
 
     def clear(self):
         del self.redis[self.key]
+        self.cache = []
 
     def extend(self, other):
-        # TODO: Test & Benchmark this
         if isinstance(other, UserList) and other.data:
-            self.redis.rpush(self.key, *[pickle.dumps(i, protocol=settings.PICKLE_PROTOCOL) for i in other.data])
-        elif other:
-            # List comprehension will throw TypeError if `other` is not
-            # iterable, which is exactly what we want, since that is what
-            # list.extend() also does
-            self.redis.rpush(self.key, *[pickle.dumps(i, protocol=settings.PICKLE_PROTOCOL) for i in other])
+            other = other.data.copy()
+        if other:
+            # Will throw TypeError if `other` is not iterable:
+            self.cache.extend(other)
+            self.pull_from_cache()
 
     # The following methods do not return a RedisList instance, as that
     # would require a new Redis key. Instead, they return an instance of the
