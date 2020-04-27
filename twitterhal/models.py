@@ -1,3 +1,4 @@
+import logging
 import pickle
 import shelve
 from collections import UserList
@@ -5,48 +6,39 @@ from datetime import datetime
 from email.utils import formatdate
 from threading import RLock
 
-from Levenshtein import ratio  # pylint: disable=no-name-in-module
+from Levenshtein import ratio
 from twitter.models import Status
 
 from twitterhal.conf import settings
 from twitterhal.util import strip_phrase
 
+logger = logging.getLogger(__name__)
+
 
 class DatabaseItem:
-    def __init__(self, type_, *default_args, is_list=False, **default_kwargs):
+    def __init__(self, type_, **defaults):
         self.type = type_
-        self.is_list = is_list
-        self.default_args = default_args
-        self.default_kwargs = default_kwargs
-        self.value = self.type(*default_args, **default_kwargs)
-
-    def __setattr__(self, name, value):
-        if name == "value" and not isinstance(value, self.type):
-            raise TypeError
-        super().__setattr__(name, value)
+        self.defaults = defaults
 
 
-class Database:
-    """Wrapper for typed `shelve` DB storing TwitterHAL data."""
-
-    def __init__(self, db_path="twitterhal"):
-        """Initialize the DB.
-
-        Args:
-            db_path (str, optional): Path to the .db file on disk, without
-                extension. Default: "twitterhal"
-        """
+class BaseDatabase:
+    def __init__(self):
+        """Initialize the DB."""
         self._is_open = False
-        self._db_path = db_path
-        self._lock = RLock()
         self._schema = {
-            "posted_tweets": DatabaseItem(TweetList, is_list=True, unique=True),
-            "mentions": DatabaseItem(TweetList, is_list=True, unique=True),
+            "posted_tweets": DatabaseItem(TweetList, unique=True),
+            "mentions": DatabaseItem(TweetList, unique=True),
         }
 
-    def add_key(self, name, type_, *default_args, **default_kwargs):
-        assert not self._is_open, "Cannot add to schema once DB has been opened"
-        self._schema[name] = DatabaseItem(type_, *default_args, **default_kwargs)
+    def add_key(self, name, type_, **defaults):
+        """Add new key to database
+
+        Args:
+            name (str): Name of the key. The value will be available as
+                self.`name` on this object.
+            type_ (type): Type of object stored under this key
+        """
+        self._schema[name] = DatabaseItem(type_, **defaults)
 
     def __enter__(self):
         self.open()
@@ -56,28 +48,88 @@ class Database:
         self.close()
 
     def __setattr__(self, name, value):
-        if not name.startswith("_") and self._is_open:
-            with self._lock:
-                assert name in self._schema, "Key %s not present in DB schema" % name
-                try:
-                    self._schema[name].value = value
-                except TypeError:
-                    raise TypeError(f"{value} is of wrong type for {name}, should be: {self._schema[name].type}")
-                self._db[name] = value
+        if not name.startswith("_"):
+            assert name in self._schema, "Key %s not present in DB schema" % name
+            assert isinstance(value, self._schema[name].type), \
+                f"'{value}' is of wrong type for '{name}', should be: '{self._schema[name].type.__name__}'"
+            self.setattr(name, value)
         super().__setattr__(name, value)
+
+    def setattr(self, name, value):
+        """Hook for setting DB values
+
+        Please override this one instead of __setattr__. This will ensure
+        checks for key's existence in schema, and value being of the correct
+        type, are always made.
+        """
+        raise NotImplementedError
+
+    def open(self):
+        """Hook for opening DB
+
+        Make sure this sets self._is_open=True on success.
+        """
+        raise NotImplementedError
+
+    def close(self):
+        """Hook for closing DB
+
+        If your close method doesn't call super().close(), make sure it sets
+        self._is_open=False.
+        """
+        self._is_open = False
+        for key in self._schema.keys():
+            delattr(self, key)
+
+    def sync(self):
+        """Hook for syncing DB
+
+        If not applicable, add a sync method with just 'pass'.
+        """
+        raise NotImplementedError
+
+    def migrate_to(self, other_db):
+        assert self._is_open
+        assert isinstance(other_db, BaseDatabase)
+        assert other_db._is_open
+        for key in self._schema.keys():
+            setattr(other_db, key, getattr(self, key))
+
+
+class ShelveDatabase(BaseDatabase):
+    """Wrapper for typed `shelve` DB storing TwitterHAL data."""
+
+    def __init__(self, db_path="twitterhal"):
+        """Initialize the DB.
+
+        Args:
+            db_path (str, optional): Path to the .db file on disk, without
+                extension. Default: "twitterhal"
+        """
+        super().__init__()
+        self._db_path = db_path
+        self._lock = RLock()
+
+    def add_key(self, name, type_, **defaults):
+        assert not self._is_open, "Cannot add to schema once DB has been opened"
+        super().add_key(name, type_, **defaults)
+
+    def setattr(self, name, value):
+        with self._lock:
+            self._db[name] = value
 
     def open(self):
         with self._lock:
             self._db = shelve.open(self._db_path)
             for k, v in self._schema.items():
-                setattr(self, k, self._db.get(k, v.value))
+                setattr(self, k, self._db.get(k, v.type(**v.defaults)))
             self._is_open = True
 
     def close(self):
         with self._lock:
             self.sync()
             self._db.close()
-            self._is_open = False
+        super().close()
 
     def sync(self):
         with self._lock:
@@ -86,22 +138,131 @@ class Database:
             self._db.sync()
 
 
-class _RedisListWrapper(UserList):
-    def __init__(self, redis, type_, *default_args, **default_kwargs):
-        self.redis = redis
-        self.type = type_
-        self.wrapped_list = self.type(*default_args, **default_kwargs)
+class RedisDatabase(BaseDatabase):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self._redis_kwargs = kwargs
+
+    def __setattr__(self, name, value):
+        if not name.startswith("_") and self._is_open:
+            if isinstance(value, list):
+                value = RedisList(self._redis, name, value)
+            elif isinstance(value, UserList) and not hasattr(value, "_redis_wrapped"):
+                value = RedisList.wrap(value, self._redis, name, overwrite=True)
+        super().__setattr__(name, value)
+
+    def add_key(self, name, type_, **defaults):
+        if issubclass(type_, list):
+            type_ = RedisList
+        super().add_key(name, type_, **defaults)
+
+    def setattr(self, name, value):
+        if not isinstance(value, (list, UserList)):
+            self._redis[name] = pickle.dumps(value, protocol=settings.PICKLE_PROTOCOL)
+
+    def close(self):
+        self.sync()
+        self._redis.close()
+        super().close()
+
+    def open(self):
+        from redis import Redis
+
+        # Quick check so the number of databases is sufficient
+        if "db" in self._redis_kwargs and self._redis_kwargs["db"] > 0:
+            redis_kwargs = self._redis_kwargs.copy()
+            redis_kwargs["db"] = 0
+            redis = Redis(**redis_kwargs)
+            dbs = redis.config_get("databases")
+            assert int(dbs["databases"]) > self._redis_kwargs["db"], \
+                f"Tried to open Redis DB #{self._redis_kwargs['db']}, but there are only {dbs['databases']} databases"
+            redis.close()
+
+        self._redis = Redis(**self._redis_kwargs)
+        for key, item in self._schema.items():
+            if item.type is RedisList or item.type is list:
+                setattr(self, key, RedisList(self._redis, key, **item.defaults))
+            elif issubclass(item.type, UserList):
+                setattr(self, key, RedisList.wrap(item.type(**item.defaults), self._redis, key))
+            else:
+                value = self._redis.get(key)
+                if value is None:
+                    value = item.type(**item.defaults)
+                else:
+                    value = pickle.loads(value)
+                setattr(self, key, value)
+        self._is_open = True
+
+    def sync(self):
+        self._redis.bgsave()
 
 
-class RedisListWrapper(UserList):
+class RedisList(UserList):
     def __init__(self, redis, key, initlist=None):
+        """A near-complete UserList implementation of Redis lists.
+
+        Tries to mimick a Python list as closely as possible, in the most
+        optimized way. However, methods that would return a _new_ list instance
+        (.copy, __add__, etc) will not return a RedisList instance,
+        since that would require a new Redis key, but instead a regular list.
+
+        This class has kind of dual use cases, depending on what sort of list
+        we are dealing with. For ordinary Python list objects, just replace
+        them with a RedisList instance. For other UserList objects, however,
+        the preferred method is to transparently "wrap" them with
+        RedisList.wrap(), which replaces their `data` attribute but otherwise
+        leaves them intact.
+
+        Args:
+            redis (redis.Redis): A Redis instance
+            key (str): Redis DB key to use
+            initlist (Sequence, optional): Initial data. NB: This will
+                overwrite any pre-existing Redis list. If this is not what you
+                want, initialize with initlist=None and then append your new
+                data.
+        """
         self.redis = redis
         self.key = key
+        self._redis_wrapped = True
         if initlist is not None:
             if isinstance(initlist, UserList):
                 self.data = initlist.data[:]
             else:
                 self.data = list(initlist)
+
+    @classmethod
+    def wrap(cls, userlist, redis, key, overwrite=False):
+        """Wrap the underlying list of a UserList
+
+        This will make RedisList act as a transparent "backend" for a UserList
+        object, by setting its `data` attribute to a new RedisList.
+
+        Args:
+            userlist (collections.UserList)
+            redis (redis.Redis)
+            key (str): This will be used as key for the Redis DB
+            overwrite (bool, optional): If True, will overwrite any
+                pre-existing contents for this key in the Redis DB with the
+                contents of userlist.data. If False, the contents of
+                userlist.data will be disregarded and no longer available.
+                Default: False.
+
+        Returns:
+            The same UserList, but now "wrapped".
+
+        TODO: Implement an efficient __contains__ that does not fetch the
+        entire Redis list for each iteration :D
+        """
+        assert isinstance(userlist, UserList)
+        userlist.data = cls(redis, key, initlist=userlist.data if overwrite else None)
+        setattr(userlist, "_redis_wrapped", True)
+        return userlist
+
+    @property
+    def cache(self):
+        if not hasattr(self, "_cache") or self._cache is None:
+            self._cache = self.data
+        return self._cache
 
     @property
     def data(self):
@@ -110,13 +271,22 @@ class RedisListWrapper(UserList):
     @data.setter
     def data(self, value):
         self.clear()
+        self._cache = value
         if value:
-            self.redis.rpush(self.key, *[pickle.dumps(i) for i in value])
+            self.redis.rpush(self.key, *[pickle.dumps(i, protocol=settings.PICKLE_PROTOCOL) for i in value])
 
     def __len__(self):
-        return self.redis.llen(self.key)
+        return len(self.cache)
 
     def __getitem__(self, i):
+        if isinstance(i, slice):
+            if i.step is not None:
+                raise NotImplementedError("Slice step not implemented yet")
+            start = i.start or 0
+            stop = (i.stop or 0) - 1
+            if stop == -1:
+                return []
+            return [pickle.loads(value) for value in self.redis.lrange(self.key, start, stop)]
         value = self.redis.lindex(self.key, i)
         if value is None:
             raise IndexError("list index out of range")
@@ -125,7 +295,7 @@ class RedisListWrapper(UserList):
     def __setitem__(self, i, item):
         from redis import ResponseError
         try:
-            self.redis.lset(self.key, i, pickle.dumps(item))
+            self.redis.lset(self.key, i, pickle.dumps(item, protocol=settings.PICKLE_PROTOCOL))
         except ResponseError:
             raise IndexError("list assignment index out of range")
 
@@ -136,8 +306,30 @@ class RedisListWrapper(UserList):
             raise IndexError("list assignment index out of range")
         self.redis.lrem(self.key, 1, value)
 
+    def __iter__(self):
+        for item in self.redis.lrange(self.key, 0, -1):
+            yield pickle.loads(item)
+
+    def __iadd__(self, other):
+        self.extend(other)
+        return self
+
+    def __imul__(self, n):
+        if not isinstance(n, int):
+            raise TypeError(f"can't multiply sequnce by non-int of type '{n.__class__.__name__}'")
+        if n < 0:
+            n = 0
+        if n == 0:
+            self.clear()
+        elif n > 1:
+            items = self.redis.lrange(self.key, 0, -1)
+            if items:
+                for _ in range(1, n):
+                    self.redis.rpush(self.key, *items)
+        return self
+
     def append(self, item):
-        self.redis.rpush(self.key, pickle.dumps(item))
+        self.redis.rpush(self.key, pickle.dumps(item, protocol=settings.PICKLE_PROTOCOL))
 
     def insert(self, i, item):
         # Not safe for lists with duplicate elements
@@ -147,11 +339,13 @@ class RedisListWrapper(UserList):
             if i >= 0:
                 self.append(item)
             else:
-                self.redis.lpush(self.key, pickle.dumps(item))
+                self.redis.lpush(self.key, pickle.dumps(item, protocol=settings.PICKLE_PROTOCOL))
         else:
-            self.redis.linsert(self.key, "BEFORE", ref_item, pickle.dumps(item))
+            self.redis.linsert(self.key, "BEFORE", ref_item, pickle.dumps(item, protocol=settings.PICKLE_PROTOCOL))
 
     def pop(self, i=-1):
+        if self.redis.llen(self.key) == 0:
+            raise IndexError("pop from empty list")
         if i == -1:
             value = self.redis.rpop(self.key)
         elif i == 0:
@@ -164,7 +358,7 @@ class RedisListWrapper(UserList):
         return pickle.loads(value)
 
     def remove(self, item):
-        count = self.redis.lrem(self.key, 1, pickle.dumps(item))
+        count = self.redis.lrem(self.key, 1, pickle.dumps(item, protocol=settings.PICKLE_PROTOCOL))
         if not count:
             raise ValueError("list.remove(x): x not in list")
 
@@ -172,68 +366,30 @@ class RedisListWrapper(UserList):
         del self.redis[self.key]
 
     def extend(self, other):
-        if isinstance(other, UserList):
-            self.redis.rpush(self.key, *[pickle.dumps(i) for i in other.data])
-        else:
+        # TODO: Test & Benchmark this
+        if isinstance(other, UserList) and other.data:
+            self.redis.rpush(self.key, *[pickle.dumps(i, protocol=settings.PICKLE_PROTOCOL) for i in other.data])
+        elif other:
             # List comprehension will throw TypeError if `other` is not
             # iterable, which is exactly what we want, since that is what
             # list.extend() also does
-            self.redis.rpush(self.key, *[pickle.dumps(i) for i in other])
+            self.redis.rpush(self.key, *[pickle.dumps(i, protocol=settings.PICKLE_PROTOCOL) for i in other])
 
-    # Methods that are not applicable, since they would require a new Redis
-    # key to make any sense:
+    # The following methods do not return a RedisList instance, as that
+    # would require a new Redis key. Instead, they return an instance of the
+    # underlying sequence type (self.list_type).
     def copy(self):
-        raise NotImplementedError("Not applicable on a Redis list")
+        return self.data.copy()
 
     def __add__(self, other):
-        raise NotImplementedError("Not applicable on a Redis list")
-    __radd__ = __add__
-    __iadd__ = __add__
-    __mul__ = __add__
-    __rmul__ = __add__
-    __imul__ = __add__
+        return list(self.data + other)
 
+    def __radd__(self, other):
+        return list(list(other) + self.data)
 
-class RedisDatabase(Database):
-    """
-    self.posted_tweets m fl listor behöver kapslas in så att ändringar i
-    deras medlemmar automatiskt uppdaterar databasen.
-    Dessa är Redis-listor av picklade Tweet-objekt.
-    "Unpicklas" här till sådana inkapslade TweetLists.
-    """
-
-    def __init__(self, **kwargs):
-        self._is_open = False
-        self._schema = {
-            "posted_tweets": DatabaseItem(TweetList, TweetList(unique=True), is_list=True),
-            "mentions": DatabaseItem(TweetList, TweetList(unique=True), is_list=True),
-        }
-        self._redis_kwargs = kwargs
-
-    def __setattr__(self, name, value):
-        if not name.startswith("_"):
-            assert name in self._schema, "Key %s not present in DB schema" % name
-            self._schema[name].value = value
-
-            self._db[name] = value
-        super().__setattr__(name, value)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args, **kwargs):
-        self._db.close()
-        self._is_open = False
-
-    def open(self):
-        from redis import Redis
-
-        self._db = Redis(**self._redis_kwargs)
-        for k, v in self._schema.items():
-            if v.is_list:
-                setattr(self, k, RedisListWrapper(self._db, v.type, *v.default_args, **v.default_kwargs))
-            setattr(self, k, self._db.get(k, v.value))
-        self._is_open = True
+    def __mul__(self, n):
+        return list(self.data * n)
+    __rmul__ = __mul__
 
 
 class Tweet(Status):
@@ -291,7 +447,7 @@ class TweetList(UserList):
         """Initialize the list.
 
         Args:
-            initlist (list, optional): A list of Tweet objects
+            initlist (Sequence, optional): A sequence of Tweet objects
             unique (bool, optional): If True, the list will only contain
                 unique Tweets, based on status ID
         """
