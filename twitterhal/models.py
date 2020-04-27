@@ -194,7 +194,12 @@ class RedisDatabase(BaseDatabase):
         self._is_open = True
 
     def sync(self):
-        self._redis.bgsave()
+        # Fail silently if another save is already in progress
+        from redis import ResponseError
+        try:
+            self._redis.bgsave()
+        except ResponseError:
+            pass
 
 
 class RedisList(UserList):
