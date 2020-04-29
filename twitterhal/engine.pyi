@@ -8,6 +8,7 @@ from megahal import MegaHAL
 from twitter.ratelimit import EndpointRateLimit
 
 from twitterhal.models import BaseDatabase, Tweet, TweetList
+from twitterhal.twitter_api import TwitterApi
 
 
 class DBInstance(BaseDatabase):
@@ -16,7 +17,7 @@ class DBInstance(BaseDatabase):
 
 
 class TwitterHAL:
-    api: twitter.Api
+    api: TwitterApi
     db: DBInstance
     force: bool
     generate_random_lock: threading.Lock

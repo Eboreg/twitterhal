@@ -17,6 +17,7 @@ from twitterhal.conf import settings
 from twitterhal.gracefulkiller import killer
 from twitterhal.models import Tweet, TweetList
 from twitterhal.runtime import runner
+from twitterhal.twitter_api import TwitterApi
 
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,7 @@ class TwitterHAL:
         """
         logger.info("Starting engine ...")
         logger.debug("Initializing Twitter API ...")
-        self.api = twitter.Api(**self.get_twitter_api_kwargs())
+        self.api = TwitterApi(**self.get_twitter_api_kwargs())
         self.api.InitializeRateLimit()
         self.init_db()
         self._init_post_status_limit()
