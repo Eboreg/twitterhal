@@ -102,18 +102,18 @@ class Runner:
 
     def register_worker(self, function: "Callable", **kwargs):
         assert callable(function), "`function` must be a callable"
-        logger.debug(f"Registering {function.__name__} as Worker ...")
+        logger.info(f"Registering {function.__name__} as Worker ...")
         self.workers.append(Worker(function, **kwargs))
 
     def register_loop_task(self, function: "Callable", sleep=None, **kwargs):
         assert callable(function), "`function` must be a callable"
         assert sleep is None or (isinstance(sleep, int) and sleep >= 0), "`sleep` must be None or a positive integer"
-        logger.debug(f"Registering {function.__name__} as LoopTask with sleep={sleep} ...")
+        logger.info(f"Registering {function.__name__} as LoopTask with sleep={sleep} ...")
         self.loop_tasks.append(LoopTask(function, sleep, **kwargs))
 
     def register_post_loop_task(self, function: "Callable", **kwargs):
         assert callable(function), "`function` must be a callable"
-        logger.debug(f"Registering {function.__name__} as PostLoopTask ...")
+        logger.info(f"Registering {function.__name__} as PostLoopTask ...")
         self.post_loop_tasks.append(Task(function, **kwargs))
 
     def run_loop_tasks(self):
