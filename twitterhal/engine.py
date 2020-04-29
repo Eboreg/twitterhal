@@ -169,10 +169,8 @@ class TwitterHAL:
         while not killer.kill_now or not self.post_queue.empty():
             if self.force or self.can_post():
                 try:
-                    tweet: "Tweet" = self.post_queue.get(timeout=1)
+                    tweet: "Tweet" = self.post_queue.get(timeout=3)
                 except queue.Empty:
-                    # Of course it *shouldn't* be empty now, but we don't want
-                    # anything to fail if we can help it
                     continue
                 logger.debug(f"Got from post_queue: {tweet}")
                 self._post_tweet(tweet)
@@ -362,6 +360,8 @@ class TwitterHAL:
             mention: "Tweet" = self.mention_queue.get()
             mention.is_answered = True
             count += 1
+        if count:
+            self.db.sync("mentions")
         logger.info(f"Fetched {count} mentions and marked them as answered")
 
     def post_from_queue(self):

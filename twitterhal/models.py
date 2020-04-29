@@ -81,7 +81,7 @@ class BaseDatabase:
         for key in self._schema.keys():
             delattr(self, key)
 
-    def sync(self):
+    def sync(self, key=None):
         """Hook for syncing DB
 
         If not applicable, add a sync method with just 'pass'.
@@ -131,10 +131,11 @@ class ShelveDatabase(BaseDatabase):
             self._db.close()
         super().close()
 
-    def sync(self):
+    def sync(self, key=None):
         with self._lock:
-            for key in self._schema.keys():
-                self._db[key] = getattr(self, key)
+            for k in self._schema.keys():
+                if key is None or k == key:
+                    self._db[k] = getattr(self, k)
             self._db.sync()
 
 
@@ -193,9 +194,16 @@ class RedisDatabase(BaseDatabase):
                 setattr(self, key, value)
         self._is_open = True
 
-    def sync(self):
-        # Fail silently if another save is already in progress
+    def sync(self, key=None):
         from redis import ResponseError
+        for k, item in self._schema.items():
+            if key is not None and k != key:
+                continue
+            if item.type is RedisList:
+                getattr(self, k).sync()
+            elif issubclass(item.type, UserList):
+                getattr(self, k).data.sync()
+        # Fail silently if another save is already in progress
         try:
             self._redis.bgsave()
         except ResponseError:
@@ -268,6 +276,9 @@ class RedisList(UserList):
     def pull_from_cache(self):
         self.data = self.cache
 
+    def sync(self):
+        self.pull_from_cache()
+
     @property
     def data(self):
         return self.cache
@@ -305,7 +316,7 @@ class RedisList(UserList):
 
     def __imul__(self, n):
         if not isinstance(n, int):
-            raise TypeError(f"can't multiply sequnce by non-int of type '{n.__class__.__name__}'")
+            raise TypeError(f"can't multiply sequence by non-int of type '{n.__class__.__name__}'")
         if n < 0:
             n = 0
         if n == 0:
@@ -487,11 +498,11 @@ class TweetList(UserList):
         return self
 
     def append(self, item):
-        if self.unique or item not in self.data:
+        if not self.unique or item not in self.data:
             self.data.append(item)
 
     def insert(self, i, item):
-        if self.unique or item not in self.data:
+        if not self.unique or item not in self.data:
             self.data.insert(i, item)
 
     def extend(self, other):
@@ -548,8 +559,10 @@ class TweetList(UserList):
             t = t.timestamp()
         if not isinstance(t, (int, float)):
             raise ValueError("Argument must be a timestamp or datetime")
-        old_count = len(self.data)
-        self.data = [tweet for tweet in self.data if tweet.created_at_in_seconds >= t]
+        data = self.data.copy()
+        old_count = len(data)
+        self.data.clear()
+        self.data.extend([tweet for tweet in data if tweet.created_at_in_seconds >= t])
         return old_count - len(self.data)
 
     def fuzzy_duplicates(self, item):

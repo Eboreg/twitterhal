@@ -95,7 +95,7 @@ MEGAHAL_API = {
     "max_length": twitter.api.CHARACTER_LIMIT,
     "brainfile": "twitterhal-brain",
     "order": megahal.DEFAULT_ORDER,
-    "timeout": megahal.DEFAULT_HARD_TIMEOUT,
+    "timeout": megahal.DEFAULT_TIMEOUT,
     "banwords": ["MOST", "COMMON", "WORDS"],
 }
 ```
