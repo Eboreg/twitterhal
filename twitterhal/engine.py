@@ -175,6 +175,8 @@ class TwitterHAL:
                     continue
                 logger.debug(f"Got from post_queue: {tweet}")
                 self._post_tweet(tweet)
+            else:
+                killer.sleep(5)
         logger.debug("Recevied exit event")
 
     """ ---------- LOOP TASKS ---------- """
