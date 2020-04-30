@@ -1,17 +1,12 @@
 import datetime
 import html
 import re
-from typing import TYPE_CHECKING
 
 import emoji
 from megahal.util import split_to_sentences
 
 
-if TYPE_CHECKING:
-    from typing import List, Pattern
-
-
-emoji_pattern: "Pattern[str]" = emoji.get_emoji_regexp()
+emoji_pattern = emoji.get_emoji_regexp()
 url_pattern = re.compile(
     r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
     flags=re.IGNORECASE
@@ -21,7 +16,7 @@ url_pattern = re.compile(
 hashtag_pattern = re.compile(r"(?<!\S)(#(?!\d+(?:\s|$))\w+)")
 
 
-def strip_phrase(phrase: str) -> str:
+def strip_phrase(phrase):
     # Strip emojis
     phrase = emoji_pattern.sub("", phrase)
     # Unescape HTML entities
@@ -51,7 +46,7 @@ def strip_phrase(phrase: str) -> str:
     return phrase.strip()
 
 
-def parse_time_string_list(string: str) -> "List[datetime.time]":
+def parse_time_string_list(string):
     result = []
     times = re.split(r",\s*", string)
     for t in times:

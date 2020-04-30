@@ -9,6 +9,7 @@ def setting_str(key: Optional[str], value: str, indent: int) -> str: ...
 
 
 class Settings:
+    default_settings: Dict[str, Any]
     is_setup: bool
 
     def __getattr__(self, name: str) -> Any: ...

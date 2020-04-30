@@ -2,20 +2,15 @@ import inspect
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
-from typing import TYPE_CHECKING
 
 from twitterhal.gracefulkiller import killer
 
 
 logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    from concurrent.futures import Future
-    from typing import Callable, List
-
 
 class Task:
-    def __init__(self, function: "Callable", **kwargs):
+    def __init__(self, function, **kwargs):
         self.function = function
         self.kwargs = kwargs
 
@@ -31,9 +26,7 @@ class Task:
 
 
 class Worker(Task):
-    future: "Future"
-
-    def __init__(self, function: "Callable", **kwargs):
+    def __init__(self, function, **kwargs):
         if "restart" in kwargs:
             raise ValueError("kwargs to Worker.__init__ cannot contain `restart`")
         sig = inspect.signature(function)
@@ -53,7 +46,7 @@ class Worker(Task):
 
 
 class LoopTask(Task):
-    def __init__(self, function: "Callable", sleep=None, **kwargs):
+    def __init__(self, function, sleep=None, **kwargs):
         self.sleep = sleep
         self.lock = Lock()
         super().__init__(function, **kwargs)
@@ -81,9 +74,9 @@ class Runner:
 
     def __init__(self, sleep_seconds):
         self.sleep_seconds = sleep_seconds
-        self.loop_tasks: "List[LoopTask]" = []
-        self.post_loop_tasks: "List[Task]" = []
-        self.workers: "List[Worker]" = []
+        self.loop_tasks = []
+        self.post_loop_tasks = []
+        self.workers = []
 
     def start_workers(self):
         for worker in self.workers:
@@ -100,18 +93,18 @@ class Runner:
                     logger.error(f"Worker {worker.name} exited without exception. Restarting ...")
                 worker.future = self.executor.submit(worker, restart=True)
 
-    def register_worker(self, function: "Callable", **kwargs):
+    def register_worker(self, function, **kwargs):
         assert callable(function), "`function` must be a callable"
         logger.info(f"Registering {function.__name__} as Worker ...")
         self.workers.append(Worker(function, **kwargs))
 
-    def register_loop_task(self, function: "Callable", sleep=None, **kwargs):
+    def register_loop_task(self, function, sleep=None, **kwargs):
         assert callable(function), "`function` must be a callable"
         assert sleep is None or (isinstance(sleep, int) and sleep >= 0), "`sleep` must be None or a positive integer"
         logger.info(f"Registering {function.__name__} as LoopTask with sleep={sleep} ...")
         self.loop_tasks.append(LoopTask(function, sleep, **kwargs))
 
-    def register_post_loop_task(self, function: "Callable", **kwargs):
+    def register_post_loop_task(self, function, **kwargs):
         assert callable(function), "`function` must be a callable"
         logger.info(f"Registering {function.__name__} as PostLoopTask ...")
         self.post_loop_tasks.append(Task(function, **kwargs))

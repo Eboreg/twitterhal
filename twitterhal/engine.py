@@ -135,7 +135,7 @@ class TwitterHAL:
         If you extend the functionality and want to store additional values in
         the DB, this is the place to define them. Just do:
 
-        >>> self.db.add_key(key_name, key_type, key_default)
+        >>> self.db.add_key(key_name, key_type, **default_kwargs)
         >>> super().init_db()
         """
         logger.debug("Trying to initialize DB ...")

@@ -6,6 +6,7 @@ from twitterhal.conf import settings
 from twitterhal.engine import TwitterHAL
 from twitterhal.runtime import runner
 
+
 logging.basicConfig(
     format="%(asctime)s: [%(funcName)s: %(lineno)d] %(message)s", level=logging.INFO, datefmt="%H:%M:%S"
 )

@@ -12,6 +12,7 @@ from twitter.models import Status
 from twitterhal.conf import settings
 from twitterhal.util import strip_phrase
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -141,6 +142,12 @@ class ShelveDatabase(BaseDatabase):
 
 class RedisDatabase(BaseDatabase):
     def __init__(self, **kwargs):
+        """Initialize Redis DB
+
+        Args:
+            **kwargs (optional): All these will be sent to redis.Redis(). See
+                https://github.com/andymccurdy/redis-py for more info.
+        """
         super().__init__()
         self._redis_kwargs = kwargs
 
@@ -181,7 +188,7 @@ class RedisDatabase(BaseDatabase):
 
         self._redis = Redis(**self._redis_kwargs)
         for key, item in self._schema.items():
-            if item.type is RedisList or item.type is list:
+            if item.type is RedisList or issubclass(item.type, list):
                 setattr(self, key, RedisList(self._redis, key, **item.defaults))
             elif issubclass(item.type, UserList):
                 setattr(self, key, RedisList.wrap(item.type(**item.defaults), self._redis, key))
@@ -202,7 +209,11 @@ class RedisDatabase(BaseDatabase):
             if item.type is RedisList:
                 getattr(self, k).sync()
             elif issubclass(item.type, UserList):
-                getattr(self, k).data.sync()
+                userlist = getattr(self, k)
+                if not isinstance(userlist.data, RedisList):
+                    # If done right, this shouldn't happen. But anyway ...
+                    userlist = RedisList.wrap(userlist, self._redis, k, overwrite=True)
+                userlist.data.sync()
         # Fail silently if another save is already in progress
         try:
             self._redis.bgsave()
@@ -265,9 +276,16 @@ class RedisList(UserList):
         Returns:
             The same UserList, but now "wrapped".
         """
+        def new_setattr(obj, name, value):
+            if name == "data" and not isinstance(value, cls):
+                value = cls(redis, key, initlist=value)
+            super(obj.__class__, obj).__setattr__(name, value)
+
         assert isinstance(userlist, UserList)
         userlist.data = cls(redis, key, initlist=userlist.data if overwrite else None)
-        setattr(userlist, "_redis_wrapped", True)
+        # Now userlist.data will be a RedisList even if we reassign it :o)
+        userlist.__class__.__setattr__ = new_setattr
+        userlist._redis_wrapped = True
         return userlist
 
     def push_to_cache(self):
@@ -440,6 +458,11 @@ class Tweet(Status):
 
     @classmethod
     def from_status(cls, status):
+        """Make a Tweet object out of a twitter.models.Status object
+
+        Will set .text to .full_text if available, and then .filtered_text to
+        strip_phrase(.text)
+        """
         kwargs = {}
         for param, default in status.param_defaults.items():
             kwargs[param] = getattr(status, param, default)
@@ -455,7 +478,9 @@ class TweetList(UserList):
         Args:
             initlist (Sequence, optional): A sequence of Tweet objects
             unique (bool, optional): If True, the list will only contain
-                unique Tweets, based on status ID
+                unique Tweets, based on status ID. (Yes, I could use a set for
+                that, but I want to be able to use the same structure for
+                different kinds of Tweet lists)
         """
         self.unique = unique
         self.data = []
@@ -470,26 +495,29 @@ class TweetList(UserList):
             self.data = []
 
     def __setitem__(self, i, item):
-        if not self.unique or item not in self.data:
+        if not self.unique or item not in self.data or self.data.index(item) == i:
             self.data[i] = item
 
     def __add__(self, other):
-        if other.__class__ == self.__class__:
+        if isinstance(other, UserList):
             other = other.data
         if self.unique:
             return self.__class__(self.data + [t for t in other if t not in self.data], unique=True)
         return self.__class__(self.data + other)
 
     def __radd__(self, other):
-        if other.__class__ == self.__class__:
+        if isinstance(other, UserList):
+            if isinstance(other, self.__class__):
+                unique = other.unique
+            else:
+                unique = False
             other = other.data
-            unique = other.unique
         if unique:
             return self.__class__(other + [t for t in self.data if t not in other], unique=True)
         return self.__class__(other + self.data)
 
     def __iadd__(self, other):
-        if other.__class__ == self.__class__:
+        if isinstance(other, UserList):
             other = other.data
         if self.unique:
             self.data += [t for t in other if t not in self.data]
@@ -506,7 +534,7 @@ class TweetList(UserList):
             self.data.insert(i, item)
 
     def extend(self, other):
-        if other.__class__ == self.__class__:
+        if isinstance(other, UserList):
             other = other.data
         if self.unique:
             self.data.extend([t for t in other if t not in self.data])
@@ -543,7 +571,7 @@ class TweetList(UserList):
                     result.append(self.data[idx])
             except IndexError:
                 pass
-        self.data = result
+        return self.__class__(result, unique=self.unique)
 
     def remove_older_than(self, t):
         """Clears the list of Tweets older than a given value.
@@ -577,7 +605,7 @@ class TweetList(UserList):
             string = strip_phrase(item)
         else:
             raise ValueError("item has to be str, Tweet, or Status")
-        return self.__class__([t for t in self.data if ratio(t.filtered_text, string) > 0.8])
+        return self.__class__([t for t in self.data if ratio(t.filtered_text, string) > 0.8], unique=self.unique)
 
     @property
     def earliest_ts(self):

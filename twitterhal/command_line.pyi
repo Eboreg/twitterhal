@@ -4,6 +4,7 @@ from typing import Any, Dict, Generic, Type, TypeVar, Union
 
 import twitterhal
 
+
 TH = TypeVar("TH", bound=twitterhal.TwitterHAL)
 
 

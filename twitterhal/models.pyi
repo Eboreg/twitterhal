@@ -2,7 +2,9 @@ from collections import UserList
 from datetime import datetime
 from shelve import DbfilenameShelf
 from threading import RLock
-from typing import Any, Dict, Generic, Iterable, List, Optional, Type, TypeVar, Union
+from typing import (
+    Any, Dict, Generic, Iterable, List, Optional, Type, TypeVar, Union,
+)
 
 from redis import Redis
 from twitter.models import Status
@@ -53,6 +55,7 @@ class RedisList(UserList):
     def __init__(self, redis: Redis, key: str, initlist: Union[List, UserList, None]): ...
     def push_to_cache(self): ...
     def pull_from_cache(self): ...
+    def sync(self): ...
     @classmethod
     def wrap(cls, userlist: UserList, redis: Redis, key: str, overwrite: bool) -> UserList: ...
 

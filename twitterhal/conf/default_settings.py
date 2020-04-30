@@ -4,6 +4,7 @@ import pickle
 import megahal
 import twitter
 
+
 DATABASE_REDIS = {
     "class": "twitterhal.models.RedisDatabase",
     "options": {
