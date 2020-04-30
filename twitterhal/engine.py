@@ -377,6 +377,7 @@ class TwitterHAL:
     """ ---------- PRIVATE HELPER METHODS ---------- """
 
     def _get_missing_mentions(self):
+        logger.info("Fetching mentions ...")
         try:
             since_id = max([t.id for t in self.db.mentions])
         except ValueError:
@@ -385,6 +386,7 @@ class TwitterHAL:
         self.db.mentions.extend([Tweet.from_status(t) for t in tweets])
 
     def _get_missing_own_tweets(self):
+        logger.info("Fetching own posted tweets ...")
         try:
             since_id = max([t.id for t in self.db.posted_tweets])
         except ValueError:
@@ -395,6 +397,7 @@ class TwitterHAL:
     def _flag_replied_mentions(self):
         # Make sure _get_missing_mentions() and _get_missing_own_tweets() is
         # run *before* this one
+        logger.info("Flagging replied mentions ...")
         in_reply_to_ids = [t.in_reply_to_status_id for t in self.db.posted_tweets.replies]
         for mention in [t for t in self.db.mentions.unanswered if t.id in in_reply_to_ids]:
             mention.is_answered = True
