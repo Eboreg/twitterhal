@@ -70,6 +70,11 @@ class TwitterHAL:
             logger.info("TEST MODE")
         if init_megahal:
             self.megahal
+        self.init_db()
+        logger.debug("Initializing Twitter API ...")
+        self.api = TwitterApi(**self.get_twitter_api_kwargs())
+        self.api.InitializeRateLimit()
+        self._init_post_status_limit()
 
     """ ---------- METHODS FOR SETTING UP STUFF ---------- """
 
@@ -86,11 +91,9 @@ class TwitterHAL:
         Will chicken out if Twitter authentication fails. This is intentional.
         """
         logger.info("Starting engine ...")
-        logger.debug("Initializing Twitter API ...")
-        self.api = TwitterApi(**self.get_twitter_api_kwargs())
-        self.api.InitializeRateLimit()
-        self.init_db()
-        self._init_post_status_limit()
+        self._get_missing_own_tweets()
+        self._get_missing_mentions()
+        self._flag_replied_mentions()
         for mention in self.db.mentions.unanswered:
             self.mention_queue.put(mention)
         self.register_workers()
@@ -140,14 +143,6 @@ class TwitterHAL:
         """
         logger.debug("Trying to initialize DB ...")
         self.db.open()
-        # Just for safety:
-        try:
-            random_tweets = self.api.GetUserTimeline(screen_name=self.screen_name, exclude_replies=True, count=1)
-        except twitter.TwitterError:
-            warnings.warn("Could not connect to Twitter API! Keys/secrets incorrect?")
-            random_tweets = []
-        if len(random_tweets) > 0:
-            self.db.posted_tweets.append(Tweet.from_status(random_tweets[0]))
         logger.debug("DB initialized")
 
     @property
@@ -355,18 +350,6 @@ class TwitterHAL:
 
     """ ---------- HELPFUL (?) UTILITY METHODS ---------- """
 
-    def mark_mentions_answered(self):
-        """Fetch all recent mentions and mark them as answered"""
-        self.get_new_mentions()
-        count = 0
-        while not self.mention_queue.empty():
-            mention: "Tweet" = self.mention_queue.get()
-            mention.is_answered = True
-            count += 1
-        if count:
-            self.db.sync("mentions")
-        logger.info(f"Fetched {count} mentions and marked them as answered")
-
     def post_from_queue(self):
         """Post all queued Tweets
 
@@ -392,6 +375,30 @@ class TwitterHAL:
             self._post_tweet(tweet)
 
     """ ---------- PRIVATE HELPER METHODS ---------- """
+
+    def _get_missing_mentions(self):
+        try:
+            since_id = max([t.id for t in self.db.mentions])
+        except ValueError:
+            since_id = None
+        tweets = self.api.GetMentions(since_id=since_id, count=200)
+        self.db.mentions.extend([Tweet.from_status(t) for t in tweets])
+
+    def _get_missing_own_tweets(self):
+        try:
+            since_id = max([t.id for t in self.db.posted_tweets])
+        except ValueError:
+            since_id = None
+        tweets = self.api.GetUserTimeline(screen_name=self.screen_name, since_id=since_id, count=200)
+        self.db.posted_tweets.extend([Tweet.from_status(t) for t in tweets])
+
+    def _flag_replied_mentions(self):
+        # Make sure _get_missing_mentions() and _get_missing_own_tweets() is
+        # run *before* this one
+        in_reply_to_ids = [t.in_reply_to_status_id for t in self.db.posted_tweets.replies]
+        for mention in [t for t in self.db.mentions.unanswered if t.id in in_reply_to_ids]:
+            mention.is_answered = True
+        self.db.sync("mentions")
 
     def _init_post_status_limit(self):
         """Initialize status/retweet post limit data
@@ -445,6 +452,7 @@ class TwitterHAL:
                 original_tweet = self.db.mentions.get_by_id(tweet.in_reply_to_status_id)
                 if original_tweet:
                     original_tweet.is_answered = True
+                    self.db.sync("mentions")
                 logger.info(f"Posted: {tweet} as reply to: {original_tweet}")
             else:
                 logger.info(f"Posted: {tweet}")

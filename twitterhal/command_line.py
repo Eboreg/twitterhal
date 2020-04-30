@@ -45,10 +45,6 @@ class CommandLine:
         self.mutex.add_argument("--print-config", action="store_true", help="Print current parsed config")
         self.mutex.add_argument("--post-random", action="store_true", help="Post a new random tweet")
         self.mutex.add_argument(
-            "--mark-mentions-answered", action="store_true",
-            help="Fetch the latest mentions and mark them all as answered. Useful if you had to re-init the DB."
-        )
-        self.mutex.add_argument(
             "--version", action="version", version="%(prog)s " + __version__,
             help="Show program's version number and exit"
         )
@@ -73,19 +69,16 @@ class CommandLine:
 
     def run(self, *args, **kwargs):
         if self.args.chat:
-            with self.TwitterHAL(**self.get_hal_kwargs()) as hal:
-                hal.megahal.interact()
+            hal = self.TwitterHAL(**self.get_hal_kwargs())
+            hal.megahal.interact()
         elif self.args.stats:
-            with self.TwitterHAL(**self.get_hal_kwargs()) as hal:
-                self.print_stats(hal)
+            hal = self.TwitterHAL(**self.get_hal_kwargs())
+            self.print_stats(hal)
         elif self.args.print_config:
             print(settings)
         elif self.args.post_random:
-            with self.TwitterHAL(**self.get_hal_kwargs()) as hal:
-                hal.post_random_tweet()
-        elif self.args.mark_mentions_answered:
-            with self.TwitterHAL(**self.get_hal_kwargs()) as hal:
-                hal.mark_mentions_answered()
+            hal = self.TwitterHAL(**self.get_hal_kwargs())
+            hal.post_random_tweet()
         elif self.args.run:
             with self.TwitterHAL(**self.get_hal_kwargs()) as hal:
                 runner.sleep_seconds = settings.RUNNER_SLEEP_SECONDS

@@ -237,6 +237,9 @@ class RedisList(UserList):
         RedisList.wrap(), which replaces their `data` attribute but otherwise
         leaves them intact.
 
+        Design goal: Data retrieval only touches self.cache, data update
+        changes Redis list first and then updates self.cache accordingly.
+
         Args:
             redis (redis.Redis): A Redis instance
             key (str): Redis DB key to use
@@ -338,10 +341,11 @@ class RedisList(UserList):
         elif n > 1:
             items = self.redis.lrange(self.key, 0, -1)
             if items:
-                with self.redis.pipeline() as pipe:
+                def multiply(pipe):
+                    pipe.multi()
                     for _ in range(1, n):
                         pipe.rpush(self.key, *items)
-                    pipe.execute()
+                self.redis.transaction(multiply, self.key)
                 self.push_to_cache()
         return self
 
