@@ -276,15 +276,8 @@ class RedisList(UserList):
         Returns:
             The same UserList, but now "wrapped".
         """
-        def new_setattr(obj, name, value):
-            if name == "data" and not isinstance(value, cls):
-                value = cls(redis, key, initlist=value)
-            super(obj.__class__, obj).__setattr__(name, value)
-
         assert isinstance(userlist, UserList)
         userlist.data = cls(redis, key, initlist=userlist.data if overwrite else None)
-        # Now userlist.data will be a RedisList even if we reassign it :o)
-        userlist.__class__.__setattr__ = new_setattr
         userlist._redis_wrapped = True
         return userlist
 
