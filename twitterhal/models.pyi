@@ -52,6 +52,11 @@ class RedisDatabase(BaseDatabase):
 
 
 class RedisList(UserList):
+    redis: Redis
+    key: str
+    data: list
+    cache: list
+
     def __init__(self, redis: Redis, key: str, initlist: Union[List, UserList, None]): ...
     def push_to_cache(self): ...
     def pull_from_cache(self): ...

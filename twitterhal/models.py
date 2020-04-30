@@ -296,10 +296,13 @@ class RedisList(UserList):
 
     @data.setter
     def data(self, value):
-        self.clear()
+        def set_data(pipe):
+            pipe.multi()
+            pipe.delete(self.key)
+            pipe.rpush(self.key, *[pickle.dumps(i, protocol=settings.PICKLE_PROTOCOL) for i in value])
         self.cache = value
         if value:
-            self.redis.rpush(self.key, *[pickle.dumps(i, protocol=settings.PICKLE_PROTOCOL) for i in value])
+            self.redis.transaction(set_data, self.key)
 
     def __setitem__(self, i, item):
         from redis import ResponseError
