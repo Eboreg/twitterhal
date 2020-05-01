@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class TwitterHAL:
     def __init__(
         self, screen_name=None, random_post_times=None, include_mentions=False,
-        init_megahal=False, force=False, test=False, **kwargs
+        force=False, test=False, **kwargs
     ):
         """Initialize the bot.
 
@@ -42,8 +42,6 @@ class TwitterHAL:
             include_mentions (bool, optional): Whether to include all
                 @mentions in our replies, and not only that of the user we're
                 replying to. Default: False
-            init_megahal (bool, optional): Initialize MegaHAL right at the
-                beginning and not on first access. Default: False
             force (bool, optional): Try and force actions even if TwitterHAL
                 doesn't want to. Default: False
             test (bool, optional): Test mode; don't actually post anything.
@@ -68,13 +66,6 @@ class TwitterHAL:
         self.test = test
         if self.test:
             logger.info("TEST MODE")
-        if init_megahal:
-            self.megahal
-        self.init_db()
-        logger.debug("Initializing Twitter API ...")
-        self.api = TwitterApi(**self.get_twitter_api_kwargs())
-        self.api.InitializeRateLimit()
-        self._init_post_status_limit()
 
     """ ---------- METHODS FOR SETTING UP STUFF ---------- """
 
@@ -84,13 +75,33 @@ class TwitterHAL:
 
     def __exit__(self, *args, **kwargs):
         self.close()
-        logger.info("Exited gracefully =)")
+        logger.debug("Exited gracefully =)")
 
     def open(self):
         """
-        Will chicken out if Twitter authentication fails. This is intentional.
+        Will *not* chicken out if Twitter authentication fails. But it will
+        happen sooner or later.
         """
-        logger.info("Starting engine ...")
+        logger.debug("Starting engine ...")
+        self.init_db()
+        logger.debug("Initializing Twitter API ...")
+        self.api = TwitterApi(**self.get_twitter_api_kwargs())
+        try:
+            self.api.InitializeRateLimit()
+        except twitter.TwitterError:
+            pass
+        self._init_post_status_limit()
+        logger.debug("Ready!")
+
+    def close(self):
+        logger.debug("Closing DB ...")
+        self.db.close()
+        if self.megahal_open:
+            logger.debug("Closing MegaHAL ...")
+            self.megahal.close()
+            self.megahal_open = False
+
+    def prepare_runner(self):
         self._get_missing_own_tweets()
         self._get_missing_mentions()
         self._flag_replied_mentions()
@@ -99,15 +110,6 @@ class TwitterHAL:
         self.register_workers()
         self.register_loop_tasks()
         self.register_post_loop_tasks()
-        logger.info("Ready!")
-
-    def close(self):
-        logger.info("Closing DB ...")
-        self.db.close()
-        if self.megahal_open:
-            logger.info("Closing MegaHAL ...")
-            self.megahal.close()
-            self.megahal_open = False
 
     def register_workers(self):
         runner.register_worker(self.post_tweets_worker)

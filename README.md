@@ -14,8 +14,11 @@ Live examples (in Swedish): [@bibel3000](https://twitter.com/bibel3000), [@trend
 * [carpedm20/emoji](https://github.com/carpedm20/emoji/)
 * [python-Levenshtein](https://github.com/ztane/python-Levenshtein)
 * OPTIONAL: [detectlanguage](https://github.com/detectlanguage/detectlanguage-python)
+* OPTIONAL: [redis-py](https://github.com/andymccurdy/redis-py)
 
-But all those should be installed automatically by `pip` or `setup.py`. (`detectlanguage` is installed by using `pip install twitterhal[detectlanguage]`.)
+But all those should be installed automatically by `pip` or `setup.py`.
+
+Use `pip install twitterhal[detectlanguage]` to install `detectlanguage`, `pip install twitterhal[redis]` to install `redis-py`.
 
 ## Usage
 
@@ -24,7 +27,7 @@ But all those should be installed automatically by `pip` or `setup.py`. (`detect
 ```
 $ twitterhal
 usage: twitterhal [-s SETTINGS_MODULE] [-d] [-m] [-f] [-t]
-                  [-r | --chat | --stats | --print-config | --post-random | --mark-mentions-answered]
+                  [-r | --chat | --stats | --print-config | --post-random | --version]
 
 optional arguments:
   -s SETTINGS_MODULE, --settings SETTINGS_MODULE
@@ -43,9 +46,7 @@ optional arguments:
   --stats               Display some stats
   --print-config        Print current parsed config
   --post-random         Post a new random tweet
-  --mark-mentions-answered
-                        Fetch the latest mentions and mark them all as
-                        answered. Useful if you had to re-init the DB.
+  --version             Show program's version number and exit
 ```
 
 `twitterhal --run` will post random tweets at `random_post_times` (see below), as well as answering all incoming mentions, all while trying its best not to exceed the [Twitter API rate limits](https://developer.twitter.com/en/docs/basics/rate-limits).
@@ -54,7 +55,7 @@ optional arguments:
 
 ```python
 from twitterhal import TwitterHAL
-with TwitterHAL(screen_name="twitterhal", twitter_kwargs={"consumer_key": "foo", "consumer_secret": "bar"}) as hal:
+with TwitterHAL(screen_name="twitterhal") as hal:
     for mention in hal.get_new_mentions():
         hal.generate_reply(mention)
     hal.generate_random()

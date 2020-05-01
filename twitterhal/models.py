@@ -287,11 +287,8 @@ class RedisList(UserList):
     def push_to_cache(self):
         self.cache = [pickle.loads(i) for i in self.redis.lrange(self.key, 0, -1)]
 
-    def pull_from_cache(self):
-        self.data = self.cache
-
     def sync(self):
-        self.pull_from_cache()
+        self.data = self.cache
 
     @property
     def data(self):
@@ -299,13 +296,14 @@ class RedisList(UserList):
 
     @data.setter
     def data(self, value):
-        def set_data(pipe):
-            pipe.multi()
-            pipe.delete(self.key)
-            pipe.rpush(self.key, *[pickle.dumps(i, protocol=settings.PICKLE_PROTOCOL) for i in value])
-        self.cache = value
-        if value:
-            self.redis.transaction(set_data, self.key)
+        if value != self.cache:
+            def set_data(pipe):
+                pipe.multi()
+                pipe.delete(self.key)
+                pipe.rpush(self.key, *[pickle.dumps(i, protocol=settings.PICKLE_PROTOCOL) for i in value])
+            self.cache = value
+            if value:
+                self.redis.transaction(set_data, self.key)
 
     def __setitem__(self, i, item):
         from redis import ResponseError
@@ -314,7 +312,7 @@ class RedisList(UserList):
         except ResponseError:
             raise IndexError("list assignment index out of range")
         else:
-            self.push_to_cache()
+            self.cache[i] = item
 
     def __delitem__(self, i):
         try:
@@ -322,7 +320,7 @@ class RedisList(UserList):
         except IndexError:
             raise IndexError("list assignment index out of range")
         else:
-            self.push_to_cache()
+            del self.cache[i]
 
     def __iter__(self):
         return self.cache.__iter__()
@@ -377,8 +375,7 @@ class RedisList(UserList):
             if value is None:
                 raise IndexError("pop index out of range")
             self.redis.lrem(self.key, 1, value)
-        self.cache.pop(i)
-        return pickle.loads(value)
+        return self.cache.pop(i)
 
     def remove(self, item):
         try:
@@ -396,8 +393,8 @@ class RedisList(UserList):
             other = other.data.copy()
         if other:
             # Will throw TypeError if `other` is not iterable:
+            self.redis.rpush(self.key, *[pickle.dumps(i, protocol=settings.PICKLE_PROTOCOL) for i in other])
             self.cache.extend(other)
-            self.pull_from_cache()
 
     # The following methods do not return a RedisList instance, as that
     # would require a new Redis key. Instead, they return an instance of the
@@ -483,16 +480,28 @@ class TweetList(UserList):
                 different kinds of Tweet lists)
         """
         self.unique = unique
-        self.data = []
+        self._data = []
         if initlist is not None:
-            if self.unique:
-                for t in initlist:
-                    if t not in self.data:
-                        self.data.append(t)
+            self.data = initlist
+
+    @property
+    def data(self):
+        return self._data
+
+    @data.setter
+    def data(self, value):
+        if self.unique and len(value) > 0:
+            tmplist = []
+            for t in value:
+                if t not in tmplist:
+                    tmplist.append(t)
+            if isinstance(value, UserList):
+                value.data = tmplist
+                self._data = value
             else:
-                self.data = initlist
+                self._data = tmplist
         else:
-            self.data = []
+            self._data = value
 
     def __setitem__(self, i, item):
         if not self.unique or item not in self.data or self.data.index(item) == i:
