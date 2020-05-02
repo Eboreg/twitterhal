@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.7 (2020-05-03)
+
+### Changes:
+
+* Adding keys to DB schema in TwitterHAL.init_db() instead of "hard-coding" them in models.BaseDatabase
+
 ## v0.5.6 (2020-05-03)
 
 ### Changes:

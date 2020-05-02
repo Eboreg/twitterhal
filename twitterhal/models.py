@@ -26,10 +26,7 @@ class BaseDatabase:
     def __init__(self):
         """Initialize the DB."""
         self._is_open = False
-        self._schema = {
-            "posted_tweets": DatabaseItem(TweetList, unique=True),
-            "mentions": DatabaseItem(TweetList, unique=True),
-        }
+        self._schema = {}
 
     def add_key(self, name, type_, **defaults):
         """Add new key to database

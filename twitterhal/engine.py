@@ -143,6 +143,8 @@ class TwitterHAL:
         >>> self.db.add_key(key_name, key_type, **default_kwargs)
         >>> super().init_db()
         """
+        self.db.add_key("posted_tweets", TweetList, unique=True)
+        self.db.add_key("mentions", TweetList, unique=True)
         logger.debug("Trying to initialize DB ...")
         self.db.open()
         logger.debug("DB initialized")
