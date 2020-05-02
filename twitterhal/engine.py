@@ -339,8 +339,9 @@ class TwitterHAL:
             else:
                 logger.info(f"Got duplicate reply, trying again (since {start_time}): {reply}")
             reply = self.megahal.get_reply_nolearn(phrase, max_length=CHARACTER_LIMIT - len(prefix))
+        text = prefix + reply.text + suffix
         tweet = Tweet(
-            text=prefix + reply.text + suffix,
+            text=text, filtered_text=text,
             in_reply_to_status_id=in_reply_to.id if in_reply_to is not None else None
         )
         logger.debug(f"Generated: {tweet}")
