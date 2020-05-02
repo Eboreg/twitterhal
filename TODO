@@ -2,14 +2,10 @@ Skriv om även MegaHAL för Redis
 
 Upptäck oändlig loop av replies pga den andre är också en bot
 
-Kontrollera härmning av input bättre
-
 Onödigt omständligt att vi först skapar en Tweet av megahal-output, sedan
 postar dess text, får en Status, och gör en ny Tweet av denna.
 
 Worker som regelbundet synkar, stänger o öppnar våra databaser
-
-Varna tydligare om man försöker använda detectlanguage och det ej finns
 
 Se till så inte hjälpfunktioner typ strip_phrase körs flera ggr i onödan
 (strip_phrase ser ej ut att göra det)

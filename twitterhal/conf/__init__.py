@@ -89,6 +89,12 @@ class Settings:
         if self.SCREEN_NAME == "":
             warnings.warn("settings.SCREEN_NAME cannot be empty")
 
+        if self.DETECTLANGUAGE_API_KEY:
+            try:
+                import detectlanguage  # noqa
+            except ImportError:
+                warnings.warn("settings.DETECTLANGUAGE_API_KEY was set, but detectlanguage could not be imported")
+
         self.is_setup = True
 
     def __setattr__(self, key, value):
