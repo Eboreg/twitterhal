@@ -191,7 +191,8 @@ class RedisDatabase(BaseDatabase):
             if item.type is RedisList or issubclass(item.type, list):
                 setattr(self, key, RedisList(self._redis, key, **item.defaults))
             elif issubclass(item.type, UserList):
-                setattr(self, key, RedisList.wrap(item.type(**item.defaults), self._redis, key))
+                unique = item.defaults.get("unique", False)
+                setattr(self, key, RedisList.wrap(item.type(**item.defaults), self._redis, key, unique=unique))
             else:
                 value = self._redis.get(key)
                 if value is None:
@@ -260,7 +261,7 @@ class RedisList(UserList):
             self.push_to_cache()
 
     @classmethod
-    def wrap(cls, userlist, redis, key, overwrite=False):
+    def wrap(cls, userlist, redis, key, overwrite=False, unique=False):
         """Wrap the underlying list of a UserList
 
         This will make RedisList act as a transparent "backend" for a UserList
@@ -275,12 +276,17 @@ class RedisList(UserList):
                 contents of userlist.data. If False, the contents of
                 userlist.data will be disregarded and no longer available.
                 Default: False.
+            unique (bool, optional): If True, and `overwrite` is False, will
+                make sure data only contains unique items (going by their
+                __hash__() value).
 
         Returns:
             The same UserList, but now "wrapped".
         """
         assert isinstance(userlist, UserList)
         userlist.data = cls(redis, key, initlist=userlist.data if overwrite else None)
+        if unique and not overwrite:
+            userlist.data.data = list(set(userlist.data.data))
         userlist._redis_wrapped = True
         return userlist
 
@@ -442,6 +448,9 @@ class Tweet(Status):
             return self.id == other.id
         return False
 
+    def __hash__(self):
+        return hash(str(self.id))
+
     def __repr__(self):
         if self.user:
             return f"Tweet<id={self.id}, screen_name={self.user.screen_name}, created={self.created_at}, " + \
@@ -479,28 +488,14 @@ class TweetList(UserList):
                 different kinds of Tweet lists)
         """
         self.unique = unique
-        self._data = []
+        self.data = []
         if initlist is not None:
-            self.data = initlist
-
-    @property
-    def data(self):
-        return self._data
-
-    @data.setter
-    def data(self, value):
-        if self.unique and len(value) > 0:
-            tmplist = []
-            for t in value:
-                if t not in tmplist:
-                    tmplist.append(t)
-            if isinstance(value, UserList):
-                value.data = tmplist
-                self._data = value
+            if self.unique:
+                self.data = list(set(initlist))
             else:
-                self._data = tmplist
+                self.data = initlist
         else:
-            self._data = value
+            self.data = []
 
     def __setitem__(self, i, item):
         if not self.unique or item not in self.data or self.data.index(item) == i:
