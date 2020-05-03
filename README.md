@@ -103,7 +103,7 @@ MEGAHAL_API = {
 
 `BANNED_USERS`: List of Twitter usernames (handles), without leading "@". We will never respond to, or mention, these users. Useful if you, for example, run two bots and don't want them to get stuck in an eternal loop responding to each other. (Perhaps, someday, I will figure out a clever way to detect such loops automatically.)
 
-`DATABASE`: A dict of info about the database backend. Must at least contain the key `class`, which must be the path of a class inheriting from `models.BaseDatabase`. Included are `models.ShelveDatabase` and `models.RedisDatabase`. The `options` key contains kwargs to be sent to that database class' `__init__()` method. When TwitterHAL is run with the `--test` option, the options will be extended with the contents of the `test_options` dict.
+`DATABASE`: A dict of info about the database backend. Must at least contain the key `class`, which must be the path of a class inheriting from `database.BaseDatabase`. Included are `database.ShelveDatabase` and `database.RedisDatabase`. The `options` key contains kwargs to be sent to that database class' `__init__()` method. When TwitterHAL is run with the `--test` option, the options will be extended with the contents of the `test_options` dict.
 
 `INCLUDE_MENTIONS`: if `True`, TwitterHAL will include _all_ mentions in its replies. That is, not only the @handle of the user who wrote to it, but also every user they mentioned in their tweet. Perhaps you should use this carefully. Anyway, the default is `False`.
 
@@ -123,9 +123,9 @@ MEGAHAL_API = {
 
 ### Persistent storage
 
-You may extend TwitterHAL's database by subclassing `TwitterHAL` and adding `models.DatabaseItem` definitions to its `init_db()` method. Maybe you want to feed the MegaHAL brain by regularily fetching top tweets for trending topics, and need to keep track of those? I know I do.
+You may extend TwitterHAL's database by subclassing `TwitterHAL` and adding `database.DatabaseItem` definitions to its `init_db()` method. Maybe you want to feed the MegaHAL brain by regularily fetching top tweets for trending topics, and need to keep track of those? I know I do.
 
-By default, the database (which is a subtype of `models.BaseDatabase`) will contain:
+By default, the database (which is a subtype of `database.BaseDatabase`) will contain:
 * `posted_tweets` (`models.TweetList`): List of posted Tweets
 * `mentions` (`models.TweetList`): List of tweets that mention us, and whether they have been answered
 

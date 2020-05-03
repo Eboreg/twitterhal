@@ -6,9 +6,11 @@ import twitter
 
 
 DATABASE_REDIS = {
-    "class": "twitterhal.models.RedisDatabase",
+    "class": "twitterhal.database.RedisDatabase",
     "options": {
         "host": "localhost",
+        "pickle_protocol": pickle.DEFAULT_PROTOCOL,
+        "namespace": "twitterhal",
         "port": 6379,
         "db": 0,
     },
@@ -17,7 +19,7 @@ DATABASE_REDIS = {
     },
 }
 DATABASE_SHELVE = {
-    "class": "twitterhal.models.ShelveDatabase",
+    "class": "twitterhal.database.ShelveDatabase",
     "options": {
         "db_path": "twitterhal",
     },
@@ -29,7 +31,6 @@ DATABASE_SHELVE = {
 DATABASE = DATABASE_SHELVE
 DETECTLANGUAGE_API_KEY = ""
 INCLUDE_MENTIONS = False
-PICKLE_PROTOCOL = pickle.DEFAULT_PROTOCOL
 POST_STATUS_LIMIT = 300
 POST_STATUS_LIMIT_RESET_FREQUENCY = 3 * 60 * 60
 RANDOM_POST_TIMES = [datetime.time(8), datetime.time(16), datetime.time(22)]

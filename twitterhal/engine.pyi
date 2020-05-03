@@ -7,7 +7,8 @@ import twitter
 from megahal import MegaHAL
 from twitter.ratelimit import EndpointRateLimit
 
-from twitterhal.models import BaseDatabase, Tweet, TweetList
+from twitterhal.database import BaseDatabase
+from twitterhal.models import Tweet, TweetList
 from twitterhal.twitter_api import TwitterApi
 
 
