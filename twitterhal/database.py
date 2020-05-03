@@ -1,6 +1,5 @@
 import pickle
 import shelve
-
 from collections import UserList
 from threading import RLock
 

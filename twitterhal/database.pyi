@@ -1,12 +1,10 @@
 import shelve
-
 from collections import UserList
 from threading import RLock
-from typing import (
-    Any, Dict, Generic, List, Optional, Type, TypeVar, Union,
-)
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
 from redis import Redis
+
 
 DBI = TypeVar("DBI")
 
