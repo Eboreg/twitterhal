@@ -162,7 +162,18 @@ class RedisDatabase(BaseDatabase):
 
     def __setattr__(self, name, value):
         if not name.startswith("_") and self._is_open:
-            if isinstance(value, (UserList, list)) and not hasattr(value, "_redis_wrapped"):
+            if isinstance(value, list):
+                for key, item in self._schema.items():
+                    if key == name:
+                        value = RedisList(
+                            self._redis,
+                            self.get_redis_key(name),
+                            initlist=value,
+                            overwrite=True,
+                            pickle_protocol=self._pickle_protocol
+                        )
+                        break
+            if isinstance(value, UserList) and not hasattr(value, "_redis_wrapped"):
                 value = RedisList.wrap(
                     value,
                     self._redis,
