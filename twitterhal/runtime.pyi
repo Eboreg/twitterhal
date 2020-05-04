@@ -1,11 +1,11 @@
 from concurrent.futures import Future
 from threading import Lock
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 class Task:
     function: Callable
-    kwargs: Dict
+    kwargs: Dict[str, Any]
     name: str
 
     def __call__(self): ...

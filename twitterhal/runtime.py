@@ -55,15 +55,18 @@ class LoopTask(Task):
         # If we are to wait until the previous run has completed, *and* it
         # hasn't; return without doing anything.
         # In all other cases; run the function
-        if self.sleep is not None:
-            if not self.lock.locked():
-                with self.lock:
-                    self.function(**self.kwargs)
-                    killer.sleep(self.sleep)
+        try:
+            if self.sleep is not None:
+                if not self.lock.locked():
+                    with self.lock:
+                        self.function(**self.kwargs)
+                        killer.sleep(self.sleep)
+                else:
+                    logger.debug(f"Loop task {self.name} still locked by previous run (sleep={self.sleep})")
             else:
-                logger.debug(f"Loop task {self.name} still locked by previous run (sleep={self.sleep})")
-        else:
-            self.function(**self.kwargs)
+                self.function(**self.kwargs)
+        except Exception as e:
+            logger.error(f"LoopTask {self.name} raised: {e}")
 
 
 class Runner:
@@ -78,26 +81,6 @@ class Runner:
         self.post_loop_tasks = []
         self.workers = []
 
-    def start_workers(self):
-        for worker in self.workers:
-            logger.info(f"Starting worker: {worker.name} ...")
-            worker.future = self.executor.submit(worker)
-
-    def restart_stopped_workers(self):
-        for worker in self.workers:
-            if not worker.future.running():
-                exc = worker.future.exception()
-                if exc is not None:
-                    logger.error(f"Worker {worker.name} raised exception: {exc}. Restarting ...")
-                else:
-                    logger.error(f"Worker {worker.name} exited without exception. Restarting ...")
-                worker.future = self.executor.submit(worker, restart=True)
-
-    def register_worker(self, function, **kwargs):
-        assert callable(function), "`function` must be a callable"
-        logger.info(f"Registering {function.__name__} as Worker ...")
-        self.workers.append(Worker(function, **kwargs))
-
     def register_loop_task(self, function, sleep=None, **kwargs):
         assert callable(function), "`function` must be a callable"
         assert sleep is None or (isinstance(sleep, int) and sleep >= 0), "`sleep` must be None or a positive integer"
@@ -109,15 +92,20 @@ class Runner:
         logger.info(f"Registering {function.__name__} as PostLoopTask ...")
         self.post_loop_tasks.append(Task(function, **kwargs))
 
-    def run_loop_tasks(self):
-        for task in self.loop_tasks:
-            logger.debug(f"Starting loop task: {task.name} ...")
-            self.executor.submit(task)
+    def register_worker(self, function, **kwargs):
+        assert callable(function), "`function` must be a callable"
+        logger.info(f"Registering {function.__name__} as Worker ...")
+        self.workers.append(Worker(function, **kwargs))
 
-    def run_post_loop_tasks(self):
-        for task in self.post_loop_tasks:
-            logger.info(f"Starting post loop task: {task.name} ...")
-            task()
+    def restart_stopped_workers(self):
+        for worker in self.workers:
+            if worker.future and not worker.future.running():
+                exc = worker.future.exception()
+                if exc is not None:
+                    logger.error(f"Worker {worker.name} raised exception: {exc}. Restarting ...")
+                else:
+                    logger.error(f"Worker {worker.name} exited without exception. Restarting ...")
+                worker.future = self.executor.submit(worker, restart=True)
 
     def run(self):
         with ThreadPoolExecutor() as self.executor:
@@ -130,6 +118,21 @@ class Runner:
                     logger.info("Pong!")
             self.run_post_loop_tasks()
             logger.info("Waiting for threads to finish ...")
+
+    def run_loop_tasks(self):
+        for task in self.loop_tasks:
+            logger.debug(f"Starting loop task: {task.name} ...")
+            self.executor.submit(task)
+
+    def run_post_loop_tasks(self):
+        for task in self.post_loop_tasks:
+            logger.info(f"Starting post loop task: {task.name} ...")
+            task()
+
+    def start_workers(self):
+        for worker in self.workers:
+            logger.info(f"Starting worker: {worker.name} ...")
+            worker.future = self.executor.submit(worker)
 
 
 runner: "Runner" = Runner(5)
