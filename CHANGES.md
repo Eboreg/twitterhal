@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.2 (2020-05-04)
+
+### Bugfixes:
+
+* `TwitterHAL.generate_tweet()` didn't include suffix in length calculation when retrying. Now fixed.
+
 ## v0.6.1 (2020-05-04)
 
 ### Changes:

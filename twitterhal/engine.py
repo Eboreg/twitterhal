@@ -340,7 +340,7 @@ class TwitterHAL:
                 logger.info(f"Got empty reply, trying again (since {start_time})")
             else:
                 logger.info(f"Got duplicate reply, trying again (since {start_time}): {reply}")
-            reply = self.megahal.get_reply_nolearn(phrase, max_length=CHARACTER_LIMIT - len(prefix))
+            reply = self.megahal.get_reply_nolearn(phrase, max_length=CHARACTER_LIMIT - len(prefix) - len(suffix))
         text = prefix + reply.text + suffix
         tweet = Tweet(
             text=text, filtered_text=text,
@@ -448,7 +448,7 @@ class TwitterHAL:
                 status = self.api.PostUpdate(
                     tweet.text, in_reply_to_status_id=tweet.in_reply_to_status_id)
         except twitter.TwitterError as e:
-            logger.error(str(e))
+            logger.error(f"Twitter raised error for {tweet}: {e}")
         else:
             # Logging the request here, since I guess it counts towards
             # the rate limit regardless of whether we succeed or not
