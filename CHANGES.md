@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.6.1 (2020-05-04)
+
+### Changes:
+
+* `runtime.LoopTask` now logs raised exceptions
+
+### Bugfixes:
+
+* `RedisDatabase.__setattr__()` now checks for `list` values and turns them into `RedisList` where applicable
+
 ## v0.6.0 (2020-05-03)
 
 ### Changes:
