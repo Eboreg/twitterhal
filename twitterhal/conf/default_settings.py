@@ -1,11 +1,10 @@
 import datetime
 import pickle
 
-import megahal
-import twitter
+from twitter.api import CHARACTER_LIMIT
 
 
-DATABASE_REDIS = {
+_DATABASE_REDIS = {
     "class": "twitterhal.database.RedisDatabase",
     "options": {
         "host": "localhost",
@@ -15,22 +14,30 @@ DATABASE_REDIS = {
         "db": 0,
     },
     "test_options": {
-        "db": 15,
+        "namespace": "twitterhal:test",
     },
 }
-DATABASE_SHELVE = {
+_MEGAHAL_DATABASE_REDIS = _DATABASE_REDIS.copy()
+_MEGAHAL_DATABASE_REDIS["options"]["namespace"] = "twitterhal:megahal"
+_MEGAHAL_DATABASE_REDIS["test_options"]["namespace"] = "twitterhal:test:megahal"
+
+_DATABASE_SHELVE = {
     "class": "twitterhal.database.ShelveDatabase",
     "options": {
         "db_path": "twitterhal",
     },
     "test_options": {
-        "db_path": "test",
+        "db_path": "twitterhal.test",
     },
 }
+_MEGAHAL_DATABASE_SHELVE = _DATABASE_SHELVE.copy()
+_MEGAHAL_DATABASE_SHELVE["options"]["db_path"] = "twitterhal.brain"
+_MEGAHAL_DATABASE_SHELVE["test_options"]["db_path"] = "twitterhal.test.brain"
 
-DATABASE = DATABASE_SHELVE
+DATABASE = _DATABASE_SHELVE
 DETECTLANGUAGE_API_KEY = ""
 INCLUDE_MENTIONS = False
+MEGAHAL_DATABASE = _MEGAHAL_DATABASE_SHELVE
 POST_STATUS_LIMIT = 300
 POST_STATUS_LIMIT_RESET_FREQUENCY = 3 * 60 * 60
 RANDOM_POST_TIMES = [datetime.time(8), datetime.time(16), datetime.time(22)]
@@ -51,9 +58,7 @@ TWITTER_API = {
 }
 
 MEGAHAL_API = {
-    "max_length": twitter.api.CHARACTER_LIMIT,
+    "max_length": CHARACTER_LIMIT,
+    # Only applies to version <0.4.0 of megahal:
     "brainfile": "twitterhal-brain",
-    "order": megahal.DEFAULT_ORDER,
-    "timeout": megahal.DEFAULT_TIMEOUT,
-    "banwords": megahal.DEFAULT_BANWORDS,
 }

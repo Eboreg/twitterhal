@@ -43,7 +43,11 @@ def strip_phrase(phrase):
             phrase = " ".join(split_to_sentences(phrase)[:-1])
     except IndexError:
         pass
-    return phrase.strip()
+    phrase = phrase.strip()
+    # Finish with a period if the sentence is unfinished
+    if phrase[-1] not in ".?!":
+        phrase += "."
+    return phrase
 
 
 def parse_time_string_list(string):

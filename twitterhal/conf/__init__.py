@@ -125,5 +125,9 @@ class Settings:
         mod, klass = self.DATABASE["class"].rsplit(".", maxsplit=1)
         return getattr(importlib.import_module(mod), klass)
 
+    def get_megahal_database_class(self):
+        mod, klass = self.MEGAHAL_DATABASE["class"].rsplit(".", maxsplit=1)
+        return getattr(importlib.import_module(mod), klass)
+
 
 settings = Settings()

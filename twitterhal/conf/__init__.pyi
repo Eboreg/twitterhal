@@ -1,8 +1,11 @@
 from types import ModuleType
 from typing import Any, Dict, Optional, Type, Union
 
+from megahal.megahal import DBInstance as MegaHALDBInstance
+
 from twitterhal.conf import default_settings
 from twitterhal.engine import DBInstance
+from twitterhal.database import BaseDatabase
 
 
 def setting_str(key: Optional[str], value: str, indent: int) -> str: ...
@@ -18,6 +21,7 @@ class Settings:
     def __str__(self) -> str: ...
     def get(self, key: str, default: Any) -> Any: ...
     def get_database_class(self) -> Type[DBInstance]: ...
+    def get_megahal_database_class(self) -> Type[MegaHALDBInstance]: ...
     def setup(self, settings_module: Union[str, ModuleType, None], settings_dict: Dict[str, Any]): ...
 
 

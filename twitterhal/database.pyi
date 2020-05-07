@@ -24,7 +24,7 @@ class DatabaseItem(Generic[DBI]):
 
 
 class BaseDatabase:
-    _is_open: bool
+    is_open: bool
     _schema: Dict[str, DatabaseItem]
 
     def __enter__(self) -> BaseDatabase: ...

@@ -8,8 +8,8 @@ import warnings
 from copy import deepcopy
 from typing import Union, cast
 
+import megahal
 import twitter
-from megahal import MegaHAL
 from twitter.api import CHARACTER_LIMIT
 from twitter.ratelimit import EndpointRateLimit
 
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class TwitterHAL:
     def __init__(
         self, screen_name=None, random_post_times=None, include_mentions=False,
-        force=False, test=False, **kwargs
+        force=False, test=False
     ):
         """Initialize the bot.
 
@@ -77,6 +77,12 @@ class TwitterHAL:
         self.close()
         logger.debug("Exited gracefully =)")
 
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
     def open(self):
         """
         Will *not* chicken out if Twitter authentication fails. But it will
@@ -88,7 +94,7 @@ class TwitterHAL:
         self.api = TwitterApi(**self.get_twitter_api_kwargs())
         try:
             self.api.InitializeRateLimit()
-        except twitter.TwitterError:
+        except (twitter.TwitterError, ConnectionError):
             pass
         self._init_post_status_limit()
         logger.debug("Ready!")
@@ -152,8 +158,16 @@ class TwitterHAL:
     @property
     def megahal(self):
         if not self.megahal_open:
-            logger.info("Initializing MegaHAL, this could take a moment ...")
-            self._megahal = MegaHAL(**self.get_megahal_api_kwargs())
+            if megahal.VERSION >= (0, 4, 0):
+                logger.info("Initializing MegaHAL, this could take a moment ...")
+                Database = settings.get_megahal_database_class()
+                db_options = settings.MEGAHAL_DATABASE.get("options", {})
+                if self.test:
+                    db_options.update(settings.MEGAHAL_DATABASE.get("test_options", {}))
+                db = Database(**db_options)
+                self._megahal = megahal.MegaHAL(db=db, **self.get_megahal_api_kwargs())
+            else:
+                self._megahal = megahal.MegaHAL(**self.get_megahal_api_kwargs())
             self.megahal_open = True
         return self._megahal
 
@@ -215,7 +229,7 @@ class TwitterHAL:
                 if m not in self.db.mentions and
                 m.user.screen_name.lower() not in [u.lower() for u in settings.BANNED_USERS]
             ]
-        except twitter.TwitterError as e:
+        except (twitter.TwitterError, ConnectionError) as e:
             logger.error(str(e))
             return TweetList()
         else:
@@ -381,6 +395,15 @@ class TwitterHAL:
 
     """ ---------- PRIVATE HELPER METHODS ---------- """
 
+    def _flag_replied_mentions(self):
+        # Make sure _get_missing_mentions() and _get_missing_own_tweets() is
+        # run *before* this one
+        logger.info("Flagging replied mentions ...")
+        in_reply_to_ids = [t.in_reply_to_status_id for t in self.db.posted_tweets.replies]
+        for mention in [t for t in self.db.mentions.unanswered if t.id in in_reply_to_ids]:
+            mention.is_answered = True
+        self.db.sync("mentions")
+
     def _get_missing_mentions(self):
         logger.info("Fetching mentions ...")
         try:
@@ -398,15 +421,6 @@ class TwitterHAL:
             since_id = None
         tweets = self.api.GetUserTimeline(screen_name=self.screen_name, since_id=since_id, count=200)
         self.db.posted_tweets.extend([Tweet.from_status(t) for t in tweets])
-
-    def _flag_replied_mentions(self):
-        # Make sure _get_missing_mentions() and _get_missing_own_tweets() is
-        # run *before* this one
-        logger.info("Flagging replied mentions ...")
-        in_reply_to_ids = [t.in_reply_to_status_id for t in self.db.posted_tweets.replies]
-        for mention in [t for t in self.db.mentions.unanswered if t.id in in_reply_to_ids]:
-            mention.is_answered = True
-        self.db.sync("mentions")
 
     def _init_post_status_limit(self):
         """Initialize status/retweet post limit data
@@ -447,7 +461,7 @@ class TwitterHAL:
             else:
                 status = self.api.PostUpdate(
                     tweet.text, in_reply_to_status_id=tweet.in_reply_to_status_id)
-        except twitter.TwitterError as e:
+        except (twitter.TwitterError, ConnectionError) as e:
             logger.error(f"Twitter raised error for {tweet}: {e}")
         else:
             # Logging the request here, since I guess it counts towards
