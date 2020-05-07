@@ -1,5 +1,6 @@
 import datetime
 import pickle
+from copy import deepcopy
 
 from twitter.api import CHARACTER_LIMIT
 
@@ -17,7 +18,7 @@ _DATABASE_REDIS = {
         "namespace": "twitterhal:test",
     },
 }
-_MEGAHAL_DATABASE_REDIS = _DATABASE_REDIS.copy()
+_MEGAHAL_DATABASE_REDIS = deepcopy(_DATABASE_REDIS)
 _MEGAHAL_DATABASE_REDIS["options"]["namespace"] = "twitterhal:megahal"
 _MEGAHAL_DATABASE_REDIS["test_options"]["namespace"] = "twitterhal:test:megahal"
 
@@ -30,7 +31,7 @@ _DATABASE_SHELVE = {
         "db_path": "twitterhal.test",
     },
 }
-_MEGAHAL_DATABASE_SHELVE = _DATABASE_SHELVE.copy()
+_MEGAHAL_DATABASE_SHELVE = deepcopy(_DATABASE_SHELVE)
 _MEGAHAL_DATABASE_SHELVE["options"]["db_path"] = "twitterhal.brain"
 _MEGAHAL_DATABASE_SHELVE["test_options"]["db_path"] = "twitterhal.test.brain"
 

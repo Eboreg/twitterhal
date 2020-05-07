@@ -114,7 +114,7 @@ class Settings:
     def __str__(self):
         ret = []
         for k, v in self.__dict__.items():
-            if k.isupper():
+            if k.isupper() and not k.startswith("_"):
                 ret.append(setting_str(key=k, value=v))
         return "\n".join(ret)
 
