@@ -29,7 +29,7 @@ class Tweet(Status):
 
     def __init__(self, is_answered=False, is_processed=False, filtered_text=None, **kwargs):
         super().__init__(**kwargs)
-        self.param_defaults.extend({
+        self.param_defaults.update({
             "filtered_text": None,
             "is_answered": None,
             "is_processed": None,
