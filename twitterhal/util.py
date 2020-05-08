@@ -33,8 +33,8 @@ def strip_phrase(phrase):
     # Remote "RT : ", denoting retweet (it used to be a @handle there before
     # we stripped it above)
     phrase = re.sub(r"^rt : ", "", phrase, flags=re.IGNORECASE)
-    # Convert non-space whitespace (\n, \t etc) to space
-    phrase = re.sub(r"\s", " ", phrase)
+    # Convert non-space whitespace (\n, \t etc) to period + space
+    phrase = re.sub(r"[.!?]*[^\S ]+", ". ", phrase)
     # Strip superfluous whitespace
     phrase = re.sub(r"\s{2,}", " ", phrase)
     # Remove trailing ellipsis + sentence that might have been cut off with it
@@ -45,7 +45,7 @@ def strip_phrase(phrase):
         pass
     phrase = phrase.strip()
     # Finish with a period if the sentence is unfinished
-    if phrase[-1] not in ".?!":
+    if phrase and phrase[-1] not in ".?!":
         phrase += "."
     return phrase
 
