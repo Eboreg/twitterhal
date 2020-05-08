@@ -29,6 +29,11 @@ class Tweet(Status):
 
     def __init__(self, is_answered=False, is_processed=False, filtered_text=None, **kwargs):
         super().__init__(**kwargs)
+        self.param_defaults.extend({
+            "filtered_text": None,
+            "is_answered": None,
+            "is_processed": None,
+        })
         self.text = self.full_text or self.text
         if filtered_text is None:
             self.filtered_text = strip_phrase(self.text or "")
@@ -55,6 +60,17 @@ class Tweet(Status):
 
     def __str__(self):
         return repr(self)
+
+    def extend(self, other):
+        """Extend this object with (non-default) attributes from `other`
+
+        Args:
+            other (Status or Tweet)
+        """
+        assert isinstance(other, (Status, Tweet))
+        for param, default in other.param_defaults.items():
+            if getattr(other, param) != default:
+                setattr(self, param, getattr(other, param))
 
     @classmethod
     def from_status(cls, status):

@@ -467,7 +467,7 @@ class TwitterHAL:
             # Logging the request here, since I guess it counts towards
             # the rate limit regardless of whether we succeed or not
             self._set_post_status_limit(subtract=1)
-            tweet = Tweet.from_status(status)
+            tweet.extend(status)
             self.db.posted_tweets.append(tweet)
             if tweet.in_reply_to_status_id:
                 # This was a reply to a mention
