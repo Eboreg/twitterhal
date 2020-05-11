@@ -1,3 +1,7 @@
+Optimera databasernas minnesanvändning. Behöver inte hålla stora caches i
+minnet hela tiden. Kanske kan RedisList iterera via yield direkt från
+databasen.
+
 Upptäck oändlig loop av replies pga den andre är också en bot
 
 Worker som regelbundet synkar, stänger o öppnar våra databaser?

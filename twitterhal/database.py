@@ -1,5 +1,6 @@
 import pickle
 import shelve
+import sys
 from collections import UserList
 from threading import RLock
 
@@ -313,6 +314,9 @@ class RedisList(UserList):
         # This hack enables us to transparently access custom attributes and
         # methods on underlying lists that extend `list`.
         return getattr(self.data, name)
+
+    def __sizeof__(self):
+        return sum([sys.getsizeof(i) for i in self.redis.lrange(self.key, 0, -1)])
 
     @classmethod
     def wrap(cls, userlist, redis, key, overwrite=False, unique=False, pickle_protocol=pickle.DEFAULT_PROTOCOL):

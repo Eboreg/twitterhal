@@ -1,6 +1,7 @@
 import datetime
 import html
 import re
+import sys
 
 import emoji
 from megahal.util import split_to_sentences
@@ -59,3 +60,42 @@ def parse_time_string_list(string):
         except ValueError:
             result.append(datetime.datetime.strptime(t, "%H:%M").time())
     return result
+
+
+def print_r(obj, name="", indent=0):
+    name = name or obj.__class__.__name__
+    if hasattr(obj, "param_defaults"):
+        print(" " * indent + name + ":")
+        for k, v in obj.param_defaults.items():
+            print_r(getattr(obj, k), k, indent + 2)
+    elif isinstance(obj, list):
+        print(" " * indent + name + ":")
+        for i, v in enumerate(obj):
+            print_r(v, i, indent + 2)
+    elif isinstance(obj, dict):
+        print(" " * indent + name + ":")
+        for k, v in obj.items():
+            print_r(v, k, indent + 2)
+    else:
+        print(" " * indent, end="")
+        if name:
+            print(f"{name}: {obj}")
+        else:
+            print(obj)
+
+
+def size_r(obj):
+    """Rough approximation of an object's cumulative size in bytes"""
+    size = 0
+    if hasattr(obj, "param_defaults"):
+        for k in obj.param_defaults:
+            size += size_r(getattr(obj, k))
+    elif isinstance(obj, list):
+        for v in obj:
+            size += size_r(v)
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            size += size_r(v)
+    else:
+        size += sys.getsizeof(obj)
+    return size
