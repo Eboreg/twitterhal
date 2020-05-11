@@ -139,6 +139,9 @@ class TweetList(UserList):
             self.data += other
         return self
 
+    def __sizeof__(self):
+        return self.data.__sizeof__()
+
     def append(self, item):
         if not self.unique or item not in self.data:
             self.data.append(item)

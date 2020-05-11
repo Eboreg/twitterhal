@@ -402,7 +402,6 @@ class TwitterHAL:
         in_reply_to_ids = [t.in_reply_to_status_id for t in self.db.posted_tweets.replies]
         for mention in [t for t in self.db.mentions.unanswered if t.id in in_reply_to_ids]:
             mention.is_answered = True
-        self.db.sync("mentions")
 
     def _get_missing_mentions(self):
         logger.info("Fetching mentions ...")
@@ -474,7 +473,6 @@ class TwitterHAL:
                 original_tweet = self.db.mentions.get_by_id(tweet.in_reply_to_status_id)
                 if original_tweet:
                     original_tweet.is_answered = True
-                    self.db.sync("mentions")
                 logger.info(f"Posted: {tweet} as reply to: {original_tweet}")
             else:
                 logger.info(f"Posted: {tweet}")

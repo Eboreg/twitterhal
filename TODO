@@ -1,3 +1,7 @@
+Gör så RedisList tar hänsyn till kwargs (typ unique=True) när den spottar ur
+sig nya listor i t ex __getitem__?
+
+
 Optimera databasernas minnesanvändning. Behöver inte hålla stora caches i
 minnet hela tiden. Kanske kan RedisList iterera via yield direkt från
 databasen.

@@ -99,3 +99,13 @@ def size_r(obj):
     else:
         size += sys.getsizeof(obj)
     return size
+
+
+def slice_to_redis_range(slice_):
+    if slice_.step is not None and slice_.step != 1:
+        raise NotImplementedError("Slice step not implemented yet")
+    if slice_.stop == 0:
+        return range(0, 0)
+    start = slice_.start or 0
+    stop = (slice_.stop or 0) - 1
+    return range(start, stop)
