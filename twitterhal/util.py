@@ -109,3 +109,7 @@ def slice_to_redis_range(slice_):
     start = slice_.start or 0
     stop = (slice_.stop or 0) - 1
     return range(start, stop)
+
+
+def camel_case(string):
+    return "".join([s.capitalize() for s in re.split(r"[\W\-_]+", string)])

@@ -4,7 +4,7 @@ import sys
 from collections import UserList
 from threading import RLock
 
-from twitterhal.util import slice_to_redis_range
+from twitterhal.util import slice_to_redis_range, camel_case
 
 
 class DatabaseItem:
@@ -260,9 +260,31 @@ class RedisDatabase(BaseDatabase):
 
 
 class RedisList(UserList):
-    def __init__(
-            self, redis, key, initlist=[], overwrite=False, list_type=None,
-            pickle_protocol=pickle.DEFAULT_PROTOCOL):
+    def __new__(cls, redis, key, list_type=None, pickle_protocol=pickle.DEFAULT_PROTOCOL, **kwargs):
+        """
+        We actually create a new class for each instantiation. This is because
+        we want to set custom attributes/methods on it, depending on what
+        custom attributes/methods are on the underlying `data` list.
+        """
+        class_name = camel_case(key) + "RedisList"
+        new_cls = type(class_name, (cls,), {})
+        new_cls.redis = redis
+        new_cls.key = key
+        new_cls.pickle_protocol = pickle_protocol
+        new_cls._redis_wrapped = True
+        if list_type is None:
+            if "initlist" in kwargs:
+                new_cls.list_type = type(kwargs["initlist"])
+            else:
+                new_cls.list_type = list
+        if new_cls.list_type is not list:
+            extra_attrs = {
+                k: v for k, v in list_type.__dict__.items() if k not in list.__dict__ and not k.startswith("__")}
+            for k, v in extra_attrs.items():
+                setattr(new_cls, k, v)
+        return super().__new__(new_cls)
+
+    def __init__(self, redis, key, initlist=[], overwrite=False, **kwargs):
         """A near-complete UserList implementation of Redis lists.
 
         Tries to mimick a Python list as closely as possible, in the most
@@ -288,24 +310,11 @@ class RedisList(UserList):
                 will be disregarded and no longer available. Default: False.
             pickle_protocol (int, optional): https://docs.python.org/3.7/library/pickle.html#data-stream-format
         """
-        self.redis = redis
-        self.key = key
-        self.pickle_protocol = pickle_protocol
-        self._redis_wrapped = True
-        if list_type is None:
-            self.list_type = type(initlist)
-        else:
-            self.list_type = list_type
         if overwrite:
             if isinstance(initlist, UserList):
                 self.data = initlist.data[:]
             else:
                 self.data = initlist
-
-    def __getattr__(self, name):
-        # This hack enables us to transparently access custom attributes and
-        # methods on underlying lists that extend `list`.
-        return getattr(self.data, name)
 
     def __sizeof__(self):
         return sum([sys.getsizeof(i) for i in self.redis.lrange(self.key, 0, -1)])
@@ -329,7 +338,8 @@ class RedisList(UserList):
             unique (bool, optional): If True, and `overwrite` is False, will
                 make sure data only contains unique items (going by their
                 __hash__() value).
-            pickle_protocol (int, optional): https://docs.python.org/3.7/library/pickle.html#data-stream-format
+            pickle_protocol (int, optional):
+                https://docs.python.org/3.7/library/pickle.html#data-stream-format
 
         Returns:
             "Wrapped" UserList
