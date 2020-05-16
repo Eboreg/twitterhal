@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.0 (2020-05-16)
+
+### Changes:
+
+* `database.RedisList` now doesn't use an in-memory cache.
+* Instantiation of `database.RedisList` actually creates a subclass, that transparently implements any custom methods on the provided `initlist` or `list_type`.
+
 ## v0.6.2 (2020-05-04)
 
 ### Bugfixes:
