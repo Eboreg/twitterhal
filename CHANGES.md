@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.1 (2020-09-06)
+
+### Changes:
+
+* `runtime.LoopTask` now checks if the running task has gone on for more than a customizable number of seconds (default: 120), in that case concludes it's has hung and runs the task anyway
+
 ## v0.7.0 (2020-05-16)
 
 ### Changes:

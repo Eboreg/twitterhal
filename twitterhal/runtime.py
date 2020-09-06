@@ -2,6 +2,7 @@ import inspect
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
+from time import time
 
 from twitterhal.gracefulkiller import killer
 
@@ -46,8 +47,12 @@ class Worker(Task):
 
 
 class LoopTask(Task):
-    def __init__(self, function, sleep=None, **kwargs):
+    # UNIX time of the start of last run
+    last_run = None
+
+    def __init__(self, function, sleep=None, seconds_until_forced_unlock=120, **kwargs):
         self.sleep = sleep
+        self.seconds_until_forced_unlock = seconds_until_forced_unlock
         self.lock = Lock()
         super().__init__(function, **kwargs)
 
@@ -57,8 +62,17 @@ class LoopTask(Task):
         # In all other cases; run the function
         try:
             if self.sleep is not None:
+                if self.lock.locked() and \
+                        self.seconds_until_forced_unlock is not None and \
+                        self.last_run is not None and \
+                        self.last_run < (int(time()) - self.seconds_until_forced_unlock):
+                    logger.debug(
+                        f"Loop task {self.name} has been running for over {self.seconds_until_forced_unlock} "
+                        "seconds; forcing restart")
+                    self.lock.release()
                 if not self.lock.locked():
                     with self.lock:
+                        self.last_run = int(time())
                         self.function(**self.kwargs)
                         killer.sleep(self.sleep)
                 else:

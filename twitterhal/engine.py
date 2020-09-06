@@ -6,7 +6,7 @@ import threading
 import time
 import warnings
 from copy import deepcopy
-from typing import Union, cast
+from typing import cast, TYPE_CHECKING
 
 import megahal
 import twitter
@@ -19,6 +19,10 @@ from twitterhal.models import Tweet, TweetList
 from twitterhal.runtime import runner
 from twitterhal.twitter_api import TwitterApi
 
+
+if TYPE_CHECKING:
+    from typing import Union
+    from .engine import DBInstance
 
 logger = logging.getLogger(__name__)
 

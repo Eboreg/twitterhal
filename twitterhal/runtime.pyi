@@ -20,8 +20,10 @@ class Worker(Task):
 class LoopTask(Task):
     lock: Lock
     sleep: Optional[int]
+    seconds_until_forced_unlock: Optional[int]
+    last_run = Optional[int]
 
-    def __init__(self, function, sleep: Optional[int], **kwargs): ...
+    def __init__(self, function, sleep: Optional[int], seconds_until_forced_unlock: Optional[int], **kwargs): ...
 
 
 class Runner:
