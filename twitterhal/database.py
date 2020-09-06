@@ -272,11 +272,10 @@ class RedisList(UserList):
         new_cls.key = key
         new_cls.pickle_protocol = pickle_protocol
         new_cls._redis_wrapped = True
-        if list_type is None:
-            if "initlist" in kwargs:
-                new_cls.list_type = type(kwargs["initlist"])
-            else:
-                new_cls.list_type = list
+        if list_type is None and "initlist" in kwargs and kwargs["initlist"] is not None:
+            new_cls.list_type = type(kwargs["initlist"])
+        else:
+            new_cls.list_type = list
         if new_cls.list_type is not list:
             extra_attrs = {
                 k: v for k, v in list_type.__dict__.items() if k not in list.__dict__ and not k.startswith("__")}
