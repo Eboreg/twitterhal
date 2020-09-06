@@ -278,7 +278,8 @@ class RedisList(UserList):
             new_cls.list_type = list
         if new_cls.list_type is not list:
             extra_attrs = {
-                k: v for k, v in list_type.__dict__.items() if k not in list.__dict__ and not k.startswith("__")}
+                k: v for k, v in new_cls.list_type.__dict__.items()
+                if k not in list.__dict__ and not k.startswith("__")}
             for k, v in extra_attrs.items():
                 setattr(new_cls, k, v)
         return super().__new__(new_cls)
