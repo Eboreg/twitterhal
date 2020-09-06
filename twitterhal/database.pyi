@@ -1,5 +1,6 @@
 import shelve
-from collections import UserList
+from abc import ABC
+from collections import UserList, UserDict
 from threading import RLock
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
@@ -57,6 +58,22 @@ class RedisDatabase(BaseDatabase):
     def __enter__(self) -> RedisDatabase: ...
     def __init__(self, pickle_protocol: int, namespace: Optional[str], **kwargs): ...
     def get_redis_key(self, name: str) -> str: ...
+
+
+class BaseRedisObject(ABC):
+    _redis_wrapped: bool
+    base_type: Type
+    key: str
+    pickle_protocol: int
+    redis: Redis
+
+    def __new__(cls, *args, redis: Redis, key: str, obj_type: Type, pickle_protocol: int, **kwargs): ...
+
+
+class RedisDict(UserDict, BaseRedisObject):
+    data: Dict
+
+    def __init__(self, *args, overwrite: bool, **kwargs): ...
 
 
 class RedisList(UserList):

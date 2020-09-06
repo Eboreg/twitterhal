@@ -1,7 +1,8 @@
 import pickle
 import shelve
 import sys
-from collections import UserList
+from abc import ABC
+from collections import UserList, UserDict
 from threading import RLock
 
 from twitterhal.util import slice_to_redis_range, camel_case
@@ -259,6 +260,76 @@ class RedisDatabase(BaseDatabase):
             pass
 
 
+class BaseRedisObject(ABC):
+    def __new__(cls, *args, redis, key, obj_type=None, pickle_protocol=pickle.DEFAULT_PROTOCOL, **kwargs):
+        """
+        We actually create a new class for each instantiation. This is because
+        we want to set custom attributes/methods on it, depending on what
+        custom attributes/methods are on the underlying object.
+        """
+        if obj_type is None:
+            if args:
+                init_obj = args[0]
+                obj_type = type(init_obj)
+            else:
+                obj_type = cls.base_type
+        class_name = camel_case(key) + "Redis" + camel_case(obj_type.__name__)
+        new_cls = type(class_name, (cls,), {})
+        new_cls.redis = redis
+        new_cls.key = key
+        new_cls.obj_type = obj_type
+        new_cls.pickle_protocol = pickle_protocol
+        new_cls._redis_wrapped = True
+        if obj_type is not cls.base_type:
+            extra_attrs = {
+                k: v for k, v in obj_type.__dict__.items()
+                if k not in new_cls.__dict__ and not k.startswith("__")}
+            for k, v in extra_attrs.items():
+                setattr(new_cls, k, v)
+        return super().__new__(new_cls)
+
+
+class RedisDict(UserDict, BaseRedisObject):
+    base_type = dict
+
+    def __init__(self, *args, overwrite=False, **kwargs):
+        if overwrite and args:
+            if isinstance(args[0], UserDict):
+                self.data = args[0].data
+            else:
+                self.data = args[0]
+
+    @property  # type: ignore
+    def data(self):
+        return self.obj_type({pickle.loads(k): pickle.loads(v) for k, v in self.redis.hgetall(self.key).items()})
+
+    @data.setter
+    def data(self, value):
+        def set_data(pipe):
+            pipe.multi()
+            pipe.delete(self.key)
+            mapping = {
+                pickle.dumps(k, protocol=self.pickle_protocol): pickle.dumps(v, protocol=self.pickle_protocol)
+                for k, v in value.items()
+            }
+            pipe.hset(self.key, mapping=mapping)
+        if value:
+            self.redis.transaction(set_data, self.key)
+
+    def __len__(self):
+        return self.redis.hlen(self.key)
+
+    def __getitem__(self, key):
+        if self.redis.hexists(self.key, key):
+            return self.redis.hget(self.key, key)
+        raise KeyError(key)
+
+    def __setitem__(self, key, item):
+        self.redis.hset(
+            self.key, key=pickle.dumps(key, protocol=self.pickle_protocol),
+            value=pickle.dumps(item, protocol=self.pickle_protocol))
+
+
 class RedisList(UserList):
     def __new__(cls, redis, key, list_type=None, pickle_protocol=pickle.DEFAULT_PROTOCOL, **kwargs):
         """
@@ -279,7 +350,8 @@ class RedisList(UserList):
                 new_cls.list_type = list
         if new_cls.list_type is not list:
             extra_attrs = {
-                k: v for k, v in list_type.__dict__.items() if k not in list.__dict__ and not k.startswith("__")}
+                k: v for k, v in new_cls.list_type.__dict__.items()
+                if k not in list.__dict__ and not k.startswith("__")}
             for k, v in extra_attrs.items():
                 setattr(new_cls, k, v)
         return super().__new__(new_cls)
