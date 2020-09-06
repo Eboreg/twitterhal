@@ -1,5 +1,6 @@
 import inspect
 import logging
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from time import time
@@ -81,6 +82,7 @@ class LoopTask(Task):
                 self.function(**self.kwargs)
         except Exception as e:
             logger.error(f"LoopTask {self.name} raised: {e}")
+            traceback.print_exc()
 
 
 class Runner:
