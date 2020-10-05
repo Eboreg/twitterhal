@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.7.3 (2020-10-05)
+
+Fixed bug where multiple instances of MegaHAL would be started simultaneously
+
 ## v0.7.2 (2020-09-06)
 
 Note: 0.7.1 was redacted for still containing bugs.
