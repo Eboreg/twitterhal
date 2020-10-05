@@ -24,6 +24,7 @@ class TwitterHAL:
     generate_random_lock: threading.Lock
     include_mentions: bool
     megahal_open: bool
+    megahal_lock: threading.Lock
     megahal: MegaHAL
     mention_queue: queue.Queue[Tweet]
     post_queue: queue.Queue[Tweet]

@@ -65,6 +65,7 @@ class TwitterHAL:
         self.force = force
 
         self.generate_random_lock = threading.Lock()
+        self.megahal_lock = threading.Lock()
         self.megahal_open = False
         self.mention_queue = queue.Queue()
         self.post_queue = queue.Queue()
@@ -162,18 +163,24 @@ class TwitterHAL:
 
     @property
     def megahal(self):
-        if not self.megahal_open:
-            self.megahal_open = True
-            if megahal.VERSION >= (0, 4, 0):
-                logger.info("Initializing MegaHAL, this could take a moment ...")
-                Database = settings.get_megahal_database_class()
-                db_options = settings.MEGAHAL_DATABASE.get("options", {})
-                if self.test:
-                    db_options.update(settings.MEGAHAL_DATABASE.get("test_options", {}))
-                db = Database(**db_options)
-                self._megahal = megahal.MegaHAL(db=db, **self.get_megahal_api_kwargs())
-            else:
-                self._megahal = megahal.MegaHAL(**self.get_megahal_api_kwargs())
+        if not self.megahal_lock.acquire(timeout=120):
+            logger.error("Timeout when acquiring megahal_lock")
+            raise TimeoutError()
+        try:
+            if not self.megahal_open:
+                self.megahal_open = True
+                if megahal.VERSION >= (0, 4, 0):
+                    logger.info("Initializing MegaHAL, this could take a moment ...")
+                    Database = settings.get_megahal_database_class()
+                    db_options = settings.MEGAHAL_DATABASE.get("options", {})
+                    if self.test:
+                        db_options.update(settings.MEGAHAL_DATABASE.get("test_options", {}))
+                    db = Database(**db_options)
+                    self._megahal = megahal.MegaHAL(db=db, **self.get_megahal_api_kwargs())
+                else:
+                    self._megahal = megahal.MegaHAL(**self.get_megahal_api_kwargs())
+        finally:
+            self.megahal_lock.release()
         return self._megahal
 
     """ ---------- SINGLETON WORKERS TO BE RUN CONTINUOUSLY ---------- """
